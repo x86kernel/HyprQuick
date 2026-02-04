@@ -55,7 +55,7 @@ Item {
         implicitHeight: Theme.blockHeight
         implicitWidth: iconLabel.implicitWidth + paddingX * 2
         radius: Theme.blockRadius
-        color: root.flashActive ? Theme.clipboardFlashBg : Theme.blockBg
+        color: root.flashActive ? Theme.textPrimary : Theme.blockBg
         border.width: 1
         border.color: Theme.blockBorder
 
@@ -67,7 +67,7 @@ Item {
             id: iconLabel
             anchors.centerIn: parent
             text: Theme.clipboardIcon
-            color: root.flashActive ? Theme.clipboardActiveText : Theme.textPrimary
+            color: root.flashActive ? Theme.textOnAccent : Theme.textPrimary
             font.family: Theme.iconFontFamily
             font.pixelSize: Theme.iconSize
             font.weight: Theme.fontWeight

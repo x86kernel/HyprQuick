@@ -9,8 +9,8 @@ Item {
     property real lastTotal: 0
     property real lastIdle: 0
     property var parentWindow: null
-    property bool hovered: false
     property string tooltipText: ""
+    signal clicked
 
     implicitHeight: container.implicitHeight
     implicitWidth: container.implicitWidth
@@ -58,22 +58,38 @@ Item {
     function parseSensors(text) {
         var lines = text.split(/\r?\n/)
         var temps = []
+        var packageLine = ""
+        var coreLine = ""
         for (var i = 0; i < lines.length; i += 1) {
-            var line = lines[i]
-            if (line.indexOf("°C") === -1) {
+            var line = lines[i].trim()
+            if (line.length === 0) {
                 continue
             }
-            var trimmed = line.trim()
-            if (trimmed.length > 0) {
-                temps.push(trimmed)
+            if (!/[+-]?[0-9.]+\s*°?C/.test(line)) {
+                continue
+            }
+            temps.push(line)
+            if (packageLine.length === 0 && line.indexOf("Package id 0:") === 0) {
+                packageLine = line
+            }
+            if (coreLine.length === 0 && line.indexOf("Core 0:") === 0) {
+                coreLine = line
             }
         }
         if (temps.length === 0) {
             return "Temp: n/a"
         }
-        var maxLines = Theme.cpuTooltipMaxLines > 0 ? Theme.cpuTooltipMaxLines : 3
-        var out = temps.slice(0, maxLines).join("\n")
-        return out
+        function extractTemp(line) {
+            var m = line.match(/[+-]?[0-9.]+\s*°?C/)
+            return m && m[0] ? m[0].replace(/\s+/g, "") : ""
+        }
+        if (packageLine.length > 0) {
+            return extractTemp(packageLine)
+        }
+        if (coreLine.length > 0) {
+            return extractTemp(coreLine)
+        }
+        return extractTemp(temps[0])
     }
 
     function refreshSensors() {
@@ -86,15 +102,14 @@ Item {
         running: false
         stdout: StdioCollector {
             onStreamFinished: {
-                root.tooltipText = "CPU " + Math.round(root.usage) + "%\n" + root.parseSensors(this.text)
-                root.updateTooltipPosition()
+                root.tooltipText = root.parseSensors(this.text)
             }
         }
     }
 
     Timer {
         interval: Theme.cpuTooltipPollInterval
-        running: root.hovered
+        running: true
         repeat: true
         onTriggered: root.refreshSensors()
         triggeredOnStart: true
@@ -142,15 +157,10 @@ Item {
         }
 
         MouseArea {
-            id: hoverArea
             anchors.fill: parent
             hoverEnabled: true
-            acceptedButtons: Qt.AllButtons
-            onEntered: {
-                root.hovered = true
-                root.refreshSensors()
-            }
-            onExited: root.hovered = false
+            cursorShape: Qt.PointingHandCursor
+            onClicked: root.clicked()
         }
     }
 }

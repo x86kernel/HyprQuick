@@ -1,9 +1,11 @@
 //@ pragma UseQApplication
+//@ pragma IconTheme Adwaita
 import Quickshell
 import QtQuick
 import QtQuick.Layouts
 import Quickshell.Hyprland
 import Quickshell.Services.Notifications
+import Quickshell.Widgets
 import Quickshell.Wayland
 import "components"
 
@@ -62,13 +64,45 @@ ShellRoot {
                 id: toastModel
             }
 
+            function normalizeNotificationText(text) {
+                var s = text || ""
+                s = s.replace(/<br\s*\/?>/gi, "\n")
+                s = s.replace(/\r\n/g, "\n")
+                s = s.replace(/\\n/g, "\n")
+                return s
+            }
+
+            function resolveNotificationIcon(iconValue) {
+                if (!iconValue || iconValue.length === 0) {
+                    return ""
+                }
+                if (iconValue.indexOf("image://icon/") === 0) {
+                    var name = iconValue.slice("image://icon/".length)
+                    var resolved = Quickshell.iconPath(name, "")
+                    return resolved && resolved.length > 0 ? resolved : ""
+                }
+                if (iconValue.indexOf("image://") === 0 || iconValue.indexOf("file://") === 0 || iconValue.indexOf("/") === 0) {
+                    return iconValue
+                }
+                var resolved = Quickshell.iconPath(iconValue, "")
+                return resolved && resolved.length > 0 ? resolved : ""
+            }
+
             function appendToast(notification) {
+                var rawIcon = notification.appIcon
+                    || notification.appIconName
+                    || notification.icon
+                    || notification.iconName
+                    || ""
+                var appIcon = resolveNotificationIcon(rawIcon)
                 toastCounter += 1
                 toastModel.append({
                     toastId: toastCounter,
-                    summary: notification.summary || "",
-                    body: notification.body || "",
-                    appName: notification.appName || ""
+                    summary: normalizeNotificationText(notification.summary),
+                    body: normalizeNotificationText(notification.body),
+                    appName: notification.appName || "",
+                    iconSource: appIcon,
+                    iconRaw: rawIcon
                 })
                 while (toastModel.count > maxToasts) {
                     toastModel.remove(0)
@@ -84,16 +118,16 @@ ShellRoot {
                 }
             }
 
-            function updateCpuTooltipAnchor() {
+            function updateCpuPopupAnchor() {
                 if (!cpuUsageIndicator) {
                     return
                 }
                 var anchorItem = bar.contentItem ? bar.contentItem : bar
                 var pos = cpuUsageIndicator.mapToItem(anchorItem, 0, cpuUsageIndicator.height)
-                cpuTooltipPopup.anchor.rect.x = pos.x + cpuUsageIndicator.width - Theme.cpuTooltipWidth
-                cpuTooltipPopup.anchor.rect.y = pos.y + Theme.cpuTooltipOffset
-                cpuTooltipPopup.anchor.rect.width = 1
-                cpuTooltipPopup.anchor.rect.height = 1
+                cpuPopup.anchor.rect.x = pos.x + cpuUsageIndicator.width - Theme.cpuPopupWidth
+                cpuPopup.anchor.rect.y = pos.y + Theme.cpuPopupOffset
+                cpuPopup.anchor.rect.width = 1
+                cpuPopup.anchor.rect.height = 1
             }
 
             function updateBluetoothPopupAnchor() {
@@ -108,8 +142,22 @@ ShellRoot {
                 bluetoothPopup.anchor.rect.height = 1
             }
 
+            function updateWifiPopupAnchor() {
+                if (!wifiIndicator) {
+                    return
+                }
+                var anchorItem = bar.contentItem ? bar.contentItem : bar
+                var pos = wifiIndicator.mapToItem(anchorItem, 0, wifiIndicator.height)
+                wifiPopup.anchor.rect.x = pos.x + wifiIndicator.width - Theme.wifiPopupWidth
+                wifiPopup.anchor.rect.y = pos.y + Theme.wifiPopupOffset
+                wifiPopup.anchor.rect.width = 1
+                wifiPopup.anchor.rect.height = 1
+            }
+
             function closeControllers() {
                 bluetoothPopup.open = false
+                wifiPopup.open = false
+                cpuPopup.open = false
                 notificationPopup.open = false
             }
 
@@ -118,8 +166,32 @@ ShellRoot {
                     bluetoothPopup.open = false
                     return
                 }
+                wifiPopup.open = false
+                cpuPopup.open = false
                 notificationPopup.open = false
                 bluetoothPopup.open = true
+            }
+
+            function toggleWifiController() {
+                if (wifiPopup.open) {
+                    wifiPopup.open = false
+                    return
+                }
+                bluetoothPopup.open = false
+                cpuPopup.open = false
+                notificationPopup.open = false
+                wifiPopup.open = true
+            }
+
+            function toggleCpuController() {
+                if (cpuPopup.open) {
+                    cpuPopup.open = false
+                    return
+                }
+                bluetoothPopup.open = false
+                wifiPopup.open = false
+                notificationPopup.open = false
+                cpuPopup.open = true
             }
 
             function toggleNotificationCenter() {
@@ -128,6 +200,8 @@ ShellRoot {
                     return
                 }
                 bluetoothPopup.open = false
+                wifiPopup.open = false
+                cpuPopup.open = false
                 notificationPopup.open = true
             }
 
@@ -192,6 +266,7 @@ ShellRoot {
                         CPUUsageIndicator {
                             id: cpuUsageIndicator
                             parentWindow: bar
+                            onClicked: bar.toggleCpuController()
                         }
 
                         MemoryUsageIndicator {
@@ -203,10 +278,20 @@ ShellRoot {
                             onClicked: bar.toggleBluetoothController()
                         }
 
+                        WifiIndicator {
+                            id: wifiIndicator
+                            onClicked: bar.toggleWifiController()
+                        }
+
+                        BatteryIndicator {
+                            id: batteryIndicator
+                        }
+
                         NotificationTrigger {
                             id: notificationTrigger
                             count: notificationCount()
                             onClicked: bar.toggleNotificationCenter()
+                            fixedWidth: bluetoothIndicator.implicitWidth
                         }
                     }
                 }
@@ -234,6 +319,26 @@ ShellRoot {
                 Component.onCompleted: {
                     if (toastPopup.WlrLayershell) {
                         toastPopup.WlrLayershell.layer = WlrLayer.Overlay
+                    }
+                }
+
+                Component {
+                    id: iconImageComp
+                    IconImage {
+                        anchors.fill: parent
+                        source: parent.iconRaw || ""
+                    }
+                }
+
+                Component {
+                    id: imageComp
+                    Image {
+                        anchors.fill: parent
+                        source: parent.iconSource || ""
+                        fillMode: Image.PreserveAspectFit
+                        smooth: true
+                        mipmap: true
+                        asynchronous: true
                     }
                 }
 
@@ -267,11 +372,7 @@ ShellRoot {
                             property bool layoutVisible: true
                             property string displayTitle: {
                                 var s = model.summary || ""
-                                if (s.length > Theme.toastTitleMaxChars) {
-                                    var app = model.appName || ""
-                                    return app.length > 0 ? app : s
-                                }
-                                return s
+                                return s.length > Theme.toastTitleMaxChars ? (model.appName || s) : s
                             }
                             property string displayBody: {
                                 var s = model.summary || ""
@@ -364,14 +465,46 @@ ShellRoot {
                                             anchors.margins: Theme.toastPadding
                                             spacing: 6
 
-                                            Text {
-                                                text: toastItem.displayTitle
-                                                color: Theme.accent
-                                                font.family: Theme.fontFamily
-                                                font.pixelSize: Theme.toastTitleSize
-                                                font.weight: Theme.fontWeight
+                                            Row {
+                                                spacing: 8
                                                 width: parent.width
-                                                wrapMode: Text.Wrap
+
+                                                Item {
+                                                    id: toastIconBox
+                                                    width: 18
+                                                    height: 18
+                                                    property string iconRaw: model.iconRaw || ""
+                                                    property string iconSource: model.iconSource || ""
+                                                    property bool useIconImage: iconRaw.indexOf("image://icon/") === 0
+
+                                                    Loader {
+                                                        anchors.fill: parent
+                                                        active: toastIconBox.useIconImage ? toastIconBox.iconRaw.length > 0 : toastIconBox.iconSource.length > 0
+                                                        sourceComponent: toastIconBox.useIconImage ? iconImageComp : imageComp
+                                                        property string iconRaw: toastIconBox.iconRaw
+                                                        property string iconSource: toastIconBox.iconSource
+                                                    }
+
+                                                    Text {
+                                                        anchors.centerIn: parent
+                                                        text: Theme.notificationFallbackIcon
+                                                        color: Theme.accent
+                                                        font.family: Theme.iconFontFamily
+                                                        font.pixelSize: Theme.iconSize
+                                                        font.weight: Theme.fontWeight
+                                                        visible: toastIconBox.useIconImage ? toastIconBox.iconRaw.length === 0 : toastIconBox.iconSource.length === 0
+                                                    }
+                                                }
+
+                                                Text {
+                                                    text: toastItem.displayTitle
+                                                    color: Theme.accent
+                                                    font.family: Theme.fontFamily
+                                                    font.pixelSize: Theme.toastTitleSize
+                                                    font.weight: Theme.fontWeight
+                                                    width: parent.width - 26
+                                                    wrapMode: Text.Wrap
+                                                }
                                             }
 
                                             Text {
@@ -380,8 +513,9 @@ ShellRoot {
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: Theme.toastBodySize
                                                 font.weight: Theme.fontWeight
+                                                textFormat: Text.PlainText
                                                 width: parent.width
-                                                wrapMode: Text.WrapAnywhere
+                                                wrapMode: Text.Wrap
                                             }
 
                                             Item {
@@ -423,47 +557,104 @@ ShellRoot {
             }
 
             PopupWindow {
-                id: cpuTooltipPopup
-                width: Theme.cpuTooltipWidth
-                height: Math.max(1, cpuTooltipText.implicitHeight)
-                visible: cpuUsageIndicator && cpuUsageIndicator.hovered
+                id: cpuPopup
+                width: Theme.cpuPopupWidth
+                implicitHeight: Math.max(1, cpuBox.implicitHeight)
+                property bool open: false
+                property real anim: open ? 1 : 0
+                visible: open || anim > 0.01
+                Behavior on anim { NumberAnimation { duration: Theme.controllerAnimMs; easing.type: Easing.OutCubic } }
                 color: "transparent"
                 anchor.window: bar
 
                 Rectangle {
+                    id: cpuBox
                     anchors.fill: parent
-                    radius: Theme.cpuTooltipRadius
-                    color: Theme.cpuTooltipBg
+                    radius: Theme.cpuPopupRadius
+                    color: Theme.cpuPopupBg
                     border.width: 1
-                    border.color: Theme.cpuTooltipBorder
+                    border.color: Theme.cpuPopupBorder
+                    implicitHeight: cpuContent.implicitHeight + Theme.cpuPopupPadding * 2
+                    opacity: cpuPopup.anim
+                    scale: 0.98 + 0.02 * cpuPopup.anim
 
-                    Text {
-                        id: cpuTooltipText
-                        anchors.fill: parent
-                        anchors.margins: Theme.cpuTooltipPadding
-                        text: cpuUsageIndicator && cpuUsageIndicator.tooltipText.length > 0
-                            ? cpuUsageIndicator.tooltipText
-                            : "CPU " + Math.round(cpuUsageIndicator ? cpuUsageIndicator.usage : 0) + "%\nTemp: n/a"
-                        color: Theme.cpuTooltipText
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.controllerFontSizeSmall
-                        font.weight: Theme.fontWeight
-                        wrapMode: Text.Wrap
+                    Column {
+                        id: cpuContent
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.top: parent.top
+                        anchors.margins: Theme.cpuPopupPadding
+                        spacing: 10
+
+                        Text {
+                            text: "CPU"
+                            color: Theme.textPrimary
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.controllerFontSize
+                            font.weight: Theme.fontWeight
+                        }
+
+                        Text {
+                            text: "Usage"
+                            color: Theme.textPrimary
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.controllerFontSizeSmall
+                            font.weight: Theme.fontWeight
+                        }
+
+                        Rectangle {
+                            width: parent.width
+                            height: 10
+                            radius: 5
+                            color: Theme.blockBg
+
+                            Rectangle {
+                                width: parent.width * Math.max(0, Math.min(1, (cpuUsageIndicator ? cpuUsageIndicator.usage : 0) / 100))
+                                height: parent.height
+                                radius: 5
+                                color: Theme.cpuText
+                            }
+                        }
+
+                        Text {
+                            text: Math.round(cpuUsageIndicator ? cpuUsageIndicator.usage : 0) + "%"
+                            color: Theme.cpuText
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.controllerFontSizeSmall
+                            font.weight: Theme.fontWeight
+                        }
+
+                        Text {
+                            text: "Temperature"
+                            color: Theme.textPrimary
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.controllerFontSizeSmall
+                            font.weight: Theme.fontWeight
+                        }
+
+                        Text {
+                            text: cpuUsageIndicator ? cpuUsageIndicator.tooltipText : "Temp: n/a"
+                            color: Theme.cpuTooltipText
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.controllerFontSizeSmall
+                            font.weight: Theme.fontWeight
+                            width: parent.width
+                            wrapMode: Text.Wrap
+                        }
                     }
                 }
 
-                onVisibleChanged: {
-                    if (visible) {
-                        bar.updateCpuTooltipAnchor()
+                onOpenChanged: {
+                    if (open) {
+                        bar.updateCpuPopupAnchor()
                     }
                 }
             }
 
             Connections {
                 target: cpuUsageIndicator
-                function onHoveredChanged() { bar.updateCpuTooltipAnchor() }
-                function onWidthChanged() { bar.updateCpuTooltipAnchor() }
-                function onHeightChanged() { bar.updateCpuTooltipAnchor() }
+                function onWidthChanged() { bar.updateCpuPopupAnchor() }
+                function onHeightChanged() { bar.updateCpuPopupAnchor() }
             }
 
             PopupWindow {
@@ -698,13 +889,187 @@ ShellRoot {
                 function onHeightChanged() { bar.updateBluetoothPopupAnchor() }
             }
 
+            PopupWindow {
+                id: wifiPopup
+                width: Theme.wifiPopupWidth
+                implicitHeight: Math.max(1, wifiBox.implicitHeight)
+                property bool open: false
+                property real anim: open ? 1 : 0
+                visible: open || anim > 0.01
+                Behavior on anim { NumberAnimation { duration: Theme.controllerAnimMs; easing.type: Easing.OutCubic } }
+                color: "transparent"
+                anchor.window: bar
+
+                Rectangle {
+                    id: wifiBox
+                    anchors.fill: parent
+                    radius: Theme.wifiPopupRadius
+                    color: Theme.wifiPopupBg
+                    border.width: 1
+                    border.color: Theme.wifiPopupBorder
+                    implicitHeight: wifiContent.implicitHeight + Theme.wifiPopupPadding * 2
+                    opacity: wifiPopup.anim
+                    scale: 0.98 + 0.02 * wifiPopup.anim
+
+                    Column {
+                        id: wifiContent
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.top: parent.top
+                        anchors.margins: Theme.wifiPopupPadding
+                        spacing: 8
+
+                        Text {
+                            text: "WiFi"
+                            color: Theme.textPrimary
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.controllerFontSize
+                            font.weight: Theme.fontWeight
+                        }
+
+                        Text {
+                            text: wifiIndicator && wifiIndicator.ssid.length > 0 ? wifiIndicator.ssid : "Not connected"
+                            color: Theme.wifiText
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.controllerFontSizeSmall
+                            font.weight: Theme.fontWeight
+                        }
+
+                        Rectangle {
+                            width: parent.width
+                            height: 28
+                            radius: 6
+                            color: Theme.accent
+
+                            Text {
+                                anchors.centerIn: parent
+                                text: wifiIndicator && wifiIndicator.radioOn ? "Turn WiFi Off" : "Turn WiFi On"
+                                color: Theme.textOnAccent
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.controllerFontSizeSmall
+                                font.weight: Theme.fontWeight
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    if (wifiIndicator) {
+                                        wifiIndicator.setWifiPower(!wifiIndicator.radioOn)
+                                    }
+                                }
+                            }
+                        }
+
+                        Text {
+                            text: "Networks"
+                            color: Theme.textPrimary
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.controllerFontSizeSmall
+                            font.weight: Theme.fontWeight
+                        }
+
+                        Grid {
+                            width: parent.width
+                            columns: 2
+                            columnSpacing: 12
+                            rowSpacing: 12
+
+                            Repeater {
+                                model: wifiIndicator ? wifiIndicator.networks : []
+
+                                delegate: Rectangle {
+                                    width: (wifiContent.width - 8) / 2
+                                    height: 38
+                                    radius: 6
+                                    color: modelData.active ? Theme.wifiText : Theme.blockBg
+                                    border.width: 1
+                                    border.color: Theme.blockBorder
+
+                                    Row {
+                                        anchors.fill: parent
+                                        anchors.margins: Theme.blockPaddingX
+                                        spacing: 6
+
+                                        Text {
+                                            text: modelData.ssid
+                                            color: modelData.active ? Theme.textOnAccent : Theme.textPrimary
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: Theme.controllerFontSizeSmall
+                                            font.weight: Theme.fontWeight
+                                            width: parent.width - Theme.wifiSignalWidth - 6
+                                            elide: Text.ElideRight
+                                            verticalAlignment: Text.AlignVCenter
+                                            height: parent.height
+                                        }
+
+                                        Text {
+                                            text: modelData.signal + "%"
+                                            color: modelData.active ? Theme.textOnAccent : Theme.textPrimary
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: Theme.controllerFontSizeSmall
+                                            verticalAlignment: Text.AlignVCenter
+                                            height: parent.height
+                                            width: Theme.wifiSignalWidth
+                                            horizontalAlignment: Text.AlignRight
+                                        }
+                                    }
+
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: {
+                                            if (!wifiIndicator)
+                                                return
+                                            if (modelData.active) {
+                                                wifiIndicator.disconnectActive()
+                                            } else {
+                                                wifiIndicator.connectTo(modelData.ssid)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        Text {
+                            visible: !wifiIndicator || wifiIndicator.networks.length === 0
+                            text: "No networks"
+                            color: Theme.textPrimary
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.controllerFontSizeSmall
+                        }
+                    }
+                }
+
+                onOpenChanged: {
+                    if (open) {
+                        bar.updateWifiPopupAnchor()
+                        if (wifiIndicator) {
+                            wifiIndicator.scanNow()
+                        }
+                    }
+                }
+            }
+
+            Connections {
+                target: wifiIndicator
+                function onNetworksChanged() { bar.updateWifiPopupAnchor() }
+                function onWidthChanged() { bar.updateWifiPopupAnchor() }
+                function onHeightChanged() { bar.updateWifiPopupAnchor() }
+            }
+
             onWidthChanged: {
                 updateBluetoothPopupAnchor()
-                updateCpuTooltipAnchor()
+                updateWifiPopupAnchor()
+                updateCpuPopupAnchor()
             }
             onHeightChanged: {
                 updateBluetoothPopupAnchor()
-                updateCpuTooltipAnchor()
+                updateWifiPopupAnchor()
+                updateCpuPopupAnchor()
             }
 
             PopupWindow {
@@ -767,11 +1132,7 @@ ShellRoot {
                                     implicitHeight: contentColumn.implicitHeight + Theme.toastPadding * 2
                                     property string displayTitle: {
                                         var s = modelData.summary || ""
-                                        if (s.length > Theme.toastTitleMaxChars) {
-                                            var app = modelData.appName || ""
-                                            return app.length > 0 ? app : s
-                                        }
-                                        return s
+                                        return s.length > Theme.toastTitleMaxChars ? (modelData.appName || s) : s
                                     }
                                     property string displayBody: {
                                         var s = modelData.summary || ""
@@ -790,15 +1151,47 @@ ShellRoot {
                                         anchors.margins: Theme.toastPadding
                                         spacing: 6
 
-                                        Text {
-                                            text: displayTitle
-                                            color: Theme.accent
-                                            font.family: Theme.fontFamily
-                                            font.pixelSize: Theme.toastTitleSize
-                                            font.weight: Theme.fontWeight
-                                            textFormat: Text.PlainText
+                                        Row {
+                                            spacing: 8
                                             width: parent.width
-                                            wrapMode: Text.Wrap
+
+                                            Item {
+                                                id: listIconBox
+                                                width: 18
+                                                height: 18
+                                                property string iconRaw: (modelData && (modelData.appIcon || modelData.appIconName || modelData.icon || modelData.iconName)) || ""
+                                                property string iconSource: resolveNotificationIcon(iconRaw)
+                                                property bool useIconImage: iconRaw.indexOf("image://icon/") === 0
+
+                                                Loader {
+                                                    anchors.fill: parent
+                                                    active: listIconBox.useIconImage ? listIconBox.iconRaw.length > 0 : listIconBox.iconSource.length > 0
+                                                    sourceComponent: listIconBox.useIconImage ? iconImageComp : imageComp
+                                                    property string iconRaw: listIconBox.iconRaw
+                                                    property string iconSource: listIconBox.iconSource
+                                                }
+
+                                                Text {
+                                                    anchors.centerIn: parent
+                                                    text: Theme.notificationFallbackIcon
+                                                    color: Theme.accent
+                                                    font.family: Theme.iconFontFamily
+                                                    font.pixelSize: Theme.iconSize
+                                                    font.weight: Theme.fontWeight
+                                                    visible: listIconBox.useIconImage ? listIconBox.iconRaw.length === 0 : listIconBox.iconSource.length === 0
+                                                }
+                                            }
+
+                                            Text {
+                                                text: displayTitle
+                                                color: Theme.accent
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: Theme.toastTitleSize
+                                                font.weight: Theme.fontWeight
+                                                textFormat: Text.PlainText
+                                                width: parent.width - 26
+                                                wrapMode: Text.Wrap
+                                            }
                                         }
 
                                         Text {

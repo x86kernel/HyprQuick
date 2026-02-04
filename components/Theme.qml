@@ -26,7 +26,7 @@ Singleton {
     property int toastTitleSize: 16
     property int toastBodySize: 14
     property int toastWidth: 360
-    property int toastTitleMaxChars: 28
+    property int toastTitleMaxChars: 32
     property int toastGap: 8
     property int toastPadding: 14
     property int toastDuration: 3500
@@ -34,6 +34,7 @@ Singleton {
     property int toastSlideOffset: 80
     property int fontWeight: Font.DemiBold
     property string notificationIcon: "󰂚"
+    property string notificationFallbackIcon: "󰂚"
     property string cpuIcon: "󰍛"
     property int cpuPollInterval: 2000
     property color cpuText: "#f2a3a3"
@@ -56,6 +57,24 @@ Singleton {
     property string bluetoothConnectIcon: "󰂯"
     property string bluetoothPairIcon: "󰌆"
     property string bluetoothDisconnectIcon: "󰂲"
+    property string wifiIcon: "󰖩"
+    property int wifiPollInterval: 3000
+    property int wifiMaxWidth: 140
+    property string wifiEmptyText: "No WiFi"
+    property color wifiText: "#a6e3a1"
+    property int wifiPopupWidth: 480
+    property int wifiPopupPadding: 12
+    property int wifiPopupRadius: 12
+    property int wifiPopupOffset: 8
+    property color wifiPopupBg: "#181826"
+    property color wifiPopupBorder: "transparent"
+    property int wifiSignalWidth: 40
+    property string batteryIconCharging: "󰂄"
+    property string batteryIconDischarging: "󰁹"
+    property string batteryIconFull: "󰁹"
+    property int batteryPollInterval: 5000
+    property string batteryUnavailableText: "--"
+    property color batteryText: "#f5c2e7"
     property int cpuTooltipWidth: 220
     property int cpuTooltipPadding: 10
     property int cpuTooltipRadius: 10
@@ -65,6 +84,12 @@ Singleton {
     property color cpuTooltipBg: "#1c1c2b"
     property color cpuTooltipBorder: "transparent"
     property color cpuTooltipText: "#f5c2e7"
+    property int cpuPopupWidth: 360
+    property int cpuPopupPadding: 12
+    property int cpuPopupRadius: 12
+    property int cpuPopupOffset: 8
+    property color cpuPopupBg: "#181826"
+    property color cpuPopupBorder: "transparent"
 
     property string clipboardIcon: "󰅌"
     property int clipboardFlashDuration: 1500

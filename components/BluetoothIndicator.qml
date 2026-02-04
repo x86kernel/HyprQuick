@@ -182,41 +182,20 @@ Item {
         property int paddingY: Theme.blockPaddingY
 
         implicitHeight: Theme.blockHeight
-        implicitWidth: row.implicitWidth + paddingX * 2
+        implicitWidth: iconLabel.implicitWidth + paddingX * 2
         radius: Theme.blockRadius
-        color: Theme.blockBg
+        color: connectedCount > 0 ? Theme.bluetoothActiveText : Theme.blockBg
         border.width: 1
         border.color: Theme.blockBorder
 
-        Row {
-            id: row
-            spacing: 8
+        Text {
+            id: iconLabel
             anchors.centerIn: parent
-            height: Math.max(iconLabel.implicitHeight, valueLabel.implicitHeight)
-
-            Text {
-                id: iconLabel
-                text: Theme.bluetoothIcon
-                color: powered ? Theme.bluetoothActiveText : Theme.bluetoothInactiveText
-                font.family: Theme.iconFontFamily
-                font.pixelSize: Theme.iconSize
-                font.weight: Theme.fontWeight
-                height: row.height
-                verticalAlignment: Text.AlignVCenter
-            }
-
-            Text {
-                id: valueLabel
-                text: available
-                    ? (powered ? (connectedCount > 0 ? String(connectedCount) : Theme.bluetoothOnText) : Theme.bluetoothOffText)
-                    : Theme.bluetoothUnavailableText
-                color: powered ? Theme.bluetoothActiveText : Theme.bluetoothInactiveText
-                font.family: Theme.fontFamily
-                font.pixelSize: Theme.fontSize
-                font.weight: Theme.fontWeight
-                height: row.height
-                verticalAlignment: Text.AlignVCenter
-            }
+            text: Theme.bluetoothIcon
+            color: connectedCount > 0 ? Theme.textOnAccent : Theme.bluetoothActiveText
+            font.family: Theme.iconFontFamily
+            font.pixelSize: Theme.iconSize
+            font.weight: Theme.fontWeight
         }
 
         MouseArea {
