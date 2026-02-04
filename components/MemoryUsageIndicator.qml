@@ -1,6 +1,6 @@
 import QtQuick
 import Quickshell.Io
-import ".."
+import "."
 
 Item {
     id: root

@@ -20,6 +20,8 @@ Singleton {
     property string iconFontFamily: "Symbols Nerd Font"
     property int fontSize: 13
     property int fontSizeSmall: 12
+    property int controllerFontSize: 15
+    property int controllerFontSizeSmall: 14
     property int iconSize: 15
     property int toastTitleSize: 16
     property int toastBodySize: 14
@@ -38,6 +40,22 @@ Singleton {
     property string memIcon: "󰘚"
     property int memPollInterval: 2000
     property color memText: "#f9e2af"
+    property string bluetoothIcon: "󰂯"
+    property int bluetoothPollInterval: 3000
+    property string bluetoothOnText: "On"
+    property string bluetoothOffText: "Off"
+    property string bluetoothUnavailableText: "BT?"
+    property color bluetoothActiveText: "#89dceb"
+    property color bluetoothInactiveText: "#585b70"
+    property int bluetoothPopupWidth: 360
+    property int bluetoothPopupPadding: 12
+    property int bluetoothPopupRadius: 12
+    property int bluetoothPopupOffset: 8
+    property color bluetoothPopupBg: "#181826"
+    property color bluetoothPopupBorder: "transparent"
+    property string bluetoothConnectIcon: "󰂯"
+    property string bluetoothPairIcon: "󰌆"
+    property string bluetoothDisconnectIcon: "󰂲"
     property int cpuTooltipWidth: 220
     property int cpuTooltipPadding: 10
     property int cpuTooltipRadius: 10
@@ -75,11 +93,18 @@ Singleton {
 
     property int popupWidth: 360
     property int popupHeight: 320
+    property int popupBottomMargin: 12
     property int popupPadding: toastPadding
     property int popupRadius: 14
     property int popupOffset: 8
     property color popupBg: "#181826"
     property color popupBorder: "transparent"
+    property int controllerAnimMs: 160
+    property string mediaIcon: "󰝚"
+    property int mediaPollInterval: 1200
+    property int mediaMaxWidth: 220
+    property color mediaText: "#f5c2e7"
+    property string mediaEmptyText: "미디어 없음"
 
     property var windowIconMappings: [
         { match: "class", pattern: "qBittorrent$", icon: "", name: "QBittorrent" },
