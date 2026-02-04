@@ -14,10 +14,11 @@ Item {
     property real highlightH: 0
     property bool highlightVisible: false
     property string highlightLabel: ""
-    property int edgePadLeft: Theme.blockPaddingX
-    property int edgePadRight: Theme.blockPaddingX
+    property int edgePadLeft: 0
+    property int edgePadRight: 0
     property var currentKey: null
     property var targetKey: null
+    property real uniformWidth: 0
 
     implicitHeight: container.implicitHeight
     implicitWidth: container.implicitWidth
@@ -74,7 +75,6 @@ Item {
         highlightH = t.h
         highlightVisible = true
         currentKey = t.key
-        updateEdgePadding()
         if (currentKey === targetKey) {
             stepTimer.stop()
         }
@@ -109,23 +109,21 @@ Item {
         return -1
     }
 
-    function updateEdgePadding() {
-        var list = collectVisiblePills()
-        if (list.length === 0) {
-            edgePadLeft = Theme.blockPaddingX
-            edgePadRight = Theme.blockPaddingX
-            return
+    function updateEdgePadding() {}
+
+    function updateUniformWidth() {
+        var maxWidth = 0
+        for (var i = 0; i < row.children.length; i += 1) {
+            var child = row.children[i]
+            if (!child || child.objectName !== "workspacePill" || !child.visible) {
+                continue
+            }
+            if (child.baseWidth > maxWidth) {
+                maxWidth = child.baseWidth
+            }
         }
-        var leftFocused = list[0].pill && list[0].pill.workspace
-            && list[0].pill.workspace.focused
-        var rightFocused = list[list.length - 1].pill
-            && list[list.length - 1].pill.workspace
-            && list[list.length - 1].pill.workspace.focused
-
-        edgePadLeft = leftFocused ? 0 : Theme.blockPaddingX
-        edgePadRight = rightFocused ? 0 : Theme.blockPaddingX
+        uniformWidth = maxWidth
     }
-
 
 
     function startStepTo(pill) {
@@ -185,11 +183,10 @@ Item {
                         ? workspace.lastIpcObject.windows > 0
                         : false
                     property real baseWidth: Math.max(30, label.implicitWidth + 16)
-                    property int focusPadX: workspace.focused ? 6 : 0
 
                     visible: workspace.active || hasWindows
                     implicitHeight: Theme.blockHeight
-                    implicitWidth: baseWidth + focusPadX * 2
+                    implicitWidth: root.uniformWidth > 0 ? root.uniformWidth : baseWidth
                     Behavior on implicitWidth { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
                     radius: Theme.blockRadius
                     color: displayFocused
@@ -216,11 +213,19 @@ Item {
                     onYChanged: updateHighlight()
                     onWidthChanged: updateHighlight()
                     onHeightChanged: updateHighlight()
-                    onVisibleChanged: updateHighlight()
-                    Component.onCompleted: updateHighlight()
+                    onVisibleChanged: {
+                        updateHighlight()
+                        root.updateUniformWidth()
+                    }
+                    Component.onCompleted: {
+                        updateHighlight()
+                        root.updateUniformWidth()
+                    }
 
                     MouseArea {
                         anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
                         onClicked: workspace.activate()
                     }
 
@@ -233,6 +238,7 @@ Item {
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontSize
                         font.weight: Theme.fontWeight
+                        onImplicitWidthChanged: root.updateUniformWidth()
                     }
                 }
             }

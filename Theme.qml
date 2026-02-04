@@ -12,22 +12,49 @@ Singleton {
     property int blockGap: 8
     property int workspaceGap: 0
 
-    property int barMarginTop: 10
+    property int barMarginTop: 8
     property int barMarginX: 8
+    property int barReserveBottom: 0
 
     property string fontFamily: "SF Pro Text"
     property string iconFontFamily: "Symbols Nerd Font"
     property int fontSize: 13
     property int fontSizeSmall: 12
+    property int iconSize: 15
     property int toastTitleSize: 16
     property int toastBodySize: 14
-    property int toastWidth: 320
+    property int toastWidth: 360
     property int toastTitleMaxChars: 28
     property int toastGap: 8
+    property int toastPadding: 14
     property int toastDuration: 3500
     property int toastAnimDuration: 520
     property int toastSlideOffset: 80
     property int fontWeight: Font.DemiBold
+    property string notificationIcon: "󰂚"
+    property string cpuIcon: "󰍛"
+    property int cpuPollInterval: 2000
+    property color cpuText: "#f2a3a3"
+    property string memIcon: "󰘚"
+    property int memPollInterval: 2000
+    property color memText: "#f9e2af"
+    property int cpuTooltipWidth: 220
+    property int cpuTooltipPadding: 10
+    property int cpuTooltipRadius: 10
+    property int cpuTooltipOffset: 6
+    property int cpuTooltipMaxLines: 3
+    property int cpuTooltipPollInterval: 2000
+    property color cpuTooltipBg: "#1c1c2b"
+    property color cpuTooltipBorder: "transparent"
+    property color cpuTooltipText: "#f5c2e7"
+
+    property string clipboardIcon: "󰅌"
+    property int clipboardFlashDuration: 1500
+    property int clipboardFlashAnimMs: 240
+    property color clipboardFlashBg: "#f5c2e7"
+    property color clipboardActiveText: "#0b0b16"
+    property color clipboardInactiveText: "#585b70"
+    property int clipboardPollInterval: 400
 
     property color blockBg: "#242438"
     property color blockBorder: "transparent"
@@ -48,7 +75,7 @@ Singleton {
 
     property int popupWidth: 360
     property int popupHeight: 320
-    property int popupPadding: 12
+    property int popupPadding: toastPadding
     property int popupRadius: 14
     property int popupOffset: 8
     property color popupBg: "#181826"

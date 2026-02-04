@@ -4,6 +4,7 @@ import QtQuick
 import QtQuick.Layouts
 import Quickshell.Hyprland
 import Quickshell.Services.Notifications
+import Quickshell.Wayland
 import "components"
 
 ShellRoot {
@@ -23,13 +24,16 @@ ShellRoot {
             margins.left: Theme.barMarginX
             margins.right: Theme.barMarginX
             implicitHeight: Theme.blockHeight + 6
-            exclusiveZone: implicitHeight + margins.top
+            exclusiveZone: implicitHeight + Theme.barReserveBottom
             color: "transparent"
 
             NotificationServer {
                 id: notificationServer
                 keepOnReload: true
                 onNotification: function(notification) {
+                    if (!bar.hyprMonitor || !bar.hyprMonitor.focused) {
+                        return
+                    }
                     notification.tracked = true
                     appendToast(notification)
                 }
@@ -78,6 +82,18 @@ ShellRoot {
                         return
                     }
                 }
+            }
+
+            function updateCpuTooltipAnchor() {
+                if (!cpuUsageIndicator) {
+                    return
+                }
+                var anchorItem = bar.contentItem ? bar.contentItem : bar
+                var pos = cpuUsageIndicator.mapToItem(anchorItem, 0, cpuUsageIndicator.height)
+                cpuTooltipPopup.anchor.rect.x = pos.x + cpuUsageIndicator.width - Theme.cpuTooltipWidth
+                cpuTooltipPopup.anchor.rect.y = pos.y + Theme.cpuTooltipOffset
+                cpuTooltipPopup.anchor.rect.width = 1
+                cpuTooltipPopup.anchor.rect.height = 1
             }
 
             RowLayout {
@@ -130,6 +146,19 @@ ShellRoot {
                             parentWindow: bar
                         }
 
+                        ClipboardIndicator {
+                            id: clipboardIndicator
+                        }
+
+                        CPUUsageIndicator {
+                            id: cpuUsageIndicator
+                            parentWindow: bar
+                        }
+
+                        MemoryUsageIndicator {
+                            id: memoryUsageIndicator
+                        }
+
                         NotificationTrigger {
                             id: notificationTrigger
                             count: notificationCount()
@@ -145,15 +174,24 @@ ShellRoot {
                 anchors.verticalCenter: parent.verticalCenter
             }
 
-            PopupWindow {
+            PanelWindow {
                 id: toastPopup
                 width: Theme.toastWidth
                 height: Math.max(1, toastStack.implicitHeight)
-                visible: toastModel.count > 0
+                visible: toastModel.count > 0 && bar.hyprMonitor && bar.hyprMonitor.focused
                 color: "transparent"
-                anchor.window: bar
-                anchor.rect.x: bar.width - width - Theme.barMarginX
-                anchor.rect.y: bar.height + Theme.popupOffset
+                screen: bar.screen
+                anchors.top: true
+                anchors.right: true
+                margins.top: Theme.barMarginTop + bar.height + Theme.popupOffset
+                margins.right: Theme.barMarginX
+                exclusionMode: ExclusionMode.Ignore
+
+                Component.onCompleted: {
+                    if (toastPopup.WlrLayershell) {
+                        toastPopup.WlrLayershell.layer = WlrLayer.Overlay
+                    }
+                }
 
                 // No height animation to avoid compressing stacked toasts on removal.
 
@@ -270,7 +308,7 @@ ShellRoot {
                                     Rectangle {
                                         id: toastContent
                                         width: parent.width
-                                        implicitHeight: toastTextColumn.implicitHeight + 20
+                                        implicitHeight: toastTextColumn.implicitHeight + Theme.toastPadding * 2
                                         radius: Theme.blockRadius
                                         color: Theme.blockBg
                                         border.width: 1
@@ -279,7 +317,7 @@ ShellRoot {
                                         Column {
                                             id: toastTextColumn
                                             anchors.fill: parent
-                                            anchors.margins: 14
+                                            anchors.margins: Theme.toastPadding
                                             spacing: 6
 
                                             Text {
@@ -288,6 +326,7 @@ ShellRoot {
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: Theme.toastTitleSize
                                                 font.weight: Theme.fontWeight
+                                                width: parent.width
                                                 wrapMode: Text.Wrap
                                             }
 
@@ -340,6 +379,53 @@ ShellRoot {
             }
 
             PopupWindow {
+                id: cpuTooltipPopup
+                width: Theme.cpuTooltipWidth
+                height: Math.max(1, cpuTooltipText.implicitHeight)
+                visible: cpuUsageIndicator && cpuUsageIndicator.hovered
+                color: "transparent"
+                anchor.window: bar
+
+                Rectangle {
+                    anchors.fill: parent
+                    radius: Theme.cpuTooltipRadius
+                    color: Theme.cpuTooltipBg
+                    border.width: 1
+                    border.color: Theme.cpuTooltipBorder
+
+                    Text {
+                        id: cpuTooltipText
+                        anchors.fill: parent
+                        anchors.margins: Theme.cpuTooltipPadding
+                        text: cpuUsageIndicator && cpuUsageIndicator.tooltipText.length > 0
+                            ? cpuUsageIndicator.tooltipText
+                            : "CPU " + Math.round(cpuUsageIndicator ? cpuUsageIndicator.usage : 0) + "%\nTemp: n/a"
+                        color: Theme.cpuTooltipText
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.fontSizeSmall
+                        font.weight: Theme.fontWeight
+                        wrapMode: Text.Wrap
+                    }
+                }
+
+                onVisibleChanged: {
+                    if (visible) {
+                        bar.updateCpuTooltipAnchor()
+                    }
+                }
+            }
+
+            Connections {
+                target: cpuUsageIndicator
+                function onHoveredChanged() { bar.updateCpuTooltipAnchor() }
+                function onWidthChanged() { bar.updateCpuTooltipAnchor() }
+                function onHeightChanged() { bar.updateCpuTooltipAnchor() }
+            }
+
+            onWidthChanged: updateCpuTooltipAnchor()
+            onHeightChanged: updateCpuTooltipAnchor()
+
+            PopupWindow {
                 id: notificationPopup
                 width: Theme.popupWidth
                 height: Theme.popupHeight
@@ -366,7 +452,7 @@ ShellRoot {
 
                         Column {
                             id: listColumn
-                            spacing: 10
+                            spacing: Theme.toastGap
                             width: parent.width
 
                             Text {
@@ -384,36 +470,41 @@ ShellRoot {
 
                                 delegate: Rectangle {
                                     width: parent.width
-                                    radius: 10
+                                    radius: Theme.blockRadius
                                     color: Theme.blockBg
                                     border.width: 1
                                     border.color: Theme.blockBorder
-                                    implicitHeight: contentColumn.implicitHeight + 16
+                                    implicitHeight: contentColumn.implicitHeight + Theme.toastPadding * 2
+                                    property string displayTitle: {
+                                        var s = modelData.summary || ""
+                                        if (s.length > Theme.toastTitleMaxChars) {
+                                            var app = modelData.appName || ""
+                                            return app.length > 0 ? app : s
+                                        }
+                                        return s
+                                    }
+                                    property string displayBody: {
+                                        var s = modelData.summary || ""
+                                        var b = modelData.body || ""
+                                        if (s.length > Theme.toastTitleMaxChars) {
+                                            if (b.length > 0)
+                                                return s + "\n" + b
+                                            return s
+                                        }
+                                        return b
+                                    }
 
                                     Column {
                                         id: contentColumn
-                                        anchors.left: parent.left
-                                        anchors.right: parent.right
-                                        anchors.margins: 8
-                                        spacing: 4
+                                        anchors.fill: parent
+                                        anchors.margins: Theme.toastPadding
+                                        spacing: 6
 
                                         Text {
-                                            text: modelData.appName && modelData.appName.length > 0 ? modelData.appName : "App"
-                                            color: Theme.textPrimary
+                                            text: displayTitle
+                                            color: Theme.accent
                                             font.family: Theme.fontFamily
-                                            font.pixelSize: Theme.fontSizeSmall
-                                            font.weight: Theme.fontWeight
-                                            textFormat: Text.PlainText
-                                            elide: Text.ElideRight
-                                            maximumLineCount: 1
-                                            width: parent.width
-                                        }
-
-                                        Text {
-                                            text: modelData.summary
-                                            color: Theme.textPrimary
-                                            font.family: Theme.fontFamily
-                                            font.pixelSize: Theme.fontSize
+                                            font.pixelSize: Theme.toastTitleSize
                                             font.weight: Theme.fontWeight
                                             textFormat: Text.PlainText
                                             width: parent.width
@@ -421,13 +512,46 @@ ShellRoot {
                                         }
 
                                         Text {
-                                            text: modelData.body
+                                            text: displayBody
                                             color: Theme.textPrimary
                                             font.family: Theme.fontFamily
-                                            font.pixelSize: Theme.fontSizeSmall
+                                            font.pixelSize: Theme.toastBodySize
                                             textFormat: Text.PlainText
                                             width: parent.width
                                             wrapMode: Text.Wrap
+                                        }
+
+                                        Item {
+                                            width: parent.width
+                                            height: 8
+                                        }
+
+                                        Rectangle {
+                                            id: notificationConfirmButton
+                                            width: parent.width
+                                            height: 28
+                                            radius: 6
+                                            color: Theme.accent
+
+                                            Text {
+                                                anchors.centerIn: parent
+                                                text: "확인"
+                                                color: Theme.textOnAccent
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: Theme.fontSizeSmall
+                                                font.weight: Theme.fontWeight
+                                            }
+
+                                            MouseArea {
+                                                anchors.fill: parent
+                                                hoverEnabled: true
+                                                cursorShape: Qt.PointingHandCursor
+                                                onClicked: {
+                                                    if (modelData && modelData.close) {
+                                                        modelData.close()
+                                                    }
+                                                }
+                                            }
                                         }
                                     }
                                 }

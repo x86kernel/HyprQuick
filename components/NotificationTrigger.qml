@@ -26,34 +26,41 @@ Item {
             spacing: 8
             anchors.centerIn: parent
 
-            Text {
-                text: "NOTI"
-                color: Theme.textPrimary
-                font.family: Theme.fontFamily
-                font.pixelSize: Theme.fontSize
-                font.weight: Theme.fontWeight
-            }
-
-            Rectangle {
-                visible: root.count > 0
-                width: 18
-                height: 18
-                radius: 9
-                color: Theme.accent
+            Item {
+                id: bellWrapper
+                width: bellIcon.implicitWidth
+                height: bellIcon.implicitHeight
 
                 Text {
+                    id: bellIcon
                     anchors.centerIn: parent
-                    text: root.count > 99 ? "99" : root.count
-                    color: Theme.textOnAccent
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSizeSmall
+                    text: Theme.notificationIcon
+                    color: Theme.textPrimary
+                    font.family: Theme.iconFontFamily
+                    font.pixelSize: Theme.iconSize
                     font.weight: Theme.fontWeight
                 }
+
+                Rectangle {
+                    visible: root.count > 0
+                    width: 6
+                    height: 6
+                    radius: 3
+                    color: Theme.accent
+                    z: 2
+                    anchors.top: parent.top
+                    anchors.right: parent.right
+                    anchors.topMargin: 1
+                    anchors.rightMargin: -2
+                }
             }
+
         }
 
         MouseArea {
             anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
             onClicked: root.clicked()
         }
     }
