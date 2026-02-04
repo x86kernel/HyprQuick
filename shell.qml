@@ -63,7 +63,8 @@ ShellRoot {
                 toastModel.append({
                     toastId: toastCounter,
                     summary: notification.summary || "",
-                    body: notification.body || ""
+                    body: notification.body || "",
+                    appName: notification.appName || ""
                 })
                 while (toastModel.count > maxToasts) {
                     toastModel.remove(0)
@@ -154,12 +155,7 @@ ShellRoot {
                 anchor.rect.x: bar.width - width - Theme.barMarginX
                 anchor.rect.y: bar.height + Theme.popupOffset
 
-                Behavior on height {
-                    NumberAnimation {
-                        duration: Theme.toastAnimDuration
-                        easing.type: Easing.OutCubic
-                    }
-                }
+                // No height animation to avoid compressing stacked toasts on removal.
 
                 Item {
                     id: toastStack
@@ -181,14 +177,34 @@ ShellRoot {
 
                         delegate: Item {
                             id: toastItem
-                            width: toastPopup.width
+                            width: Theme.toastWidth
                             implicitHeight: toastContent.implicitHeight
                             property int toastId: model.toastId
                             property bool appeared: false
                             property bool closing: false
-                            property bool layoutVisible: !closing
+                            property bool layoutVisible: true
+                            property string displayTitle: {
+                                var s = model.summary || ""
+                                if (s.length > Theme.toastTitleMaxChars) {
+                                    var app = model.appName || ""
+                                    return app.length > 0 ? app : s
+                                }
+                                return s
+                            }
+                            property string displayBody: {
+                                var s = model.summary || ""
+                                var b = model.body || ""
+                                if (s.length > Theme.toastTitleMaxChars) {
+                                    if (b.length > 0)
+                                        return s + "\n" + b
+                                    return s
+                                }
+                                return b
+                            }
+                            property real slideOffset: closing
+                                ? -(Theme.toastWidth + Theme.toastSlideOffset)
+                                : (appeared ? 0 : (Theme.toastWidth + Theme.toastSlideOffset))
 
-                            anchors.left: parent.left
                             anchors.right: parent.right
                             anchors.bottom: parent.bottom
                             anchors.bottomMargin: {
@@ -202,8 +218,7 @@ ShellRoot {
                             }
 
                             opacity: appeared && !closing ? 1 : 0
-                            scale: appeared && !closing ? 1 : 0.7
-
+                            scale: 1
                             Component.onCompleted: appeared = true
                             onClosingChanged: {
                                 if (closing)
@@ -213,23 +228,11 @@ ShellRoot {
                             Behavior on opacity {
                                 NumberAnimation {
                                     duration: Theme.toastAnimDuration
-                                    easing.type: Easing.OutCubic
+                                    easing.type: Easing.InOutSine
                                 }
                             }
 
-                            Behavior on scale {
-                                NumberAnimation {
-                                    duration: Theme.toastAnimDuration
-                                    easing.type: Easing.OutCubic
-                                }
-                            }
-
-                            Behavior on anchors.bottomMargin {
-                                NumberAnimation {
-                                    duration: Theme.toastAnimDuration
-                                    easing.type: Easing.OutCubic
-                                }
-                            }
+                            // No bottomMargin animation to avoid flicker during reflow.
 
                             Timer {
                                 id: lifeTimer
@@ -246,37 +249,88 @@ ShellRoot {
                                 onTriggered: bar.removeToastById(toastItem.toastId)
                             }
 
-                            Rectangle {
-                                id: toastContent
-                                width: parent.width
-                                implicitHeight: toastTextColumn.implicitHeight + 20
-                                radius: Theme.blockRadius
-                                color: Theme.blockBg
-                                border.width: 1
-                                border.color: Theme.blockBorder
+                            Item {
+                                id: toastClip
+                                anchors.fill: parent
+                                clip: true
 
-                                Column {
-                                    id: toastTextColumn
-                                    anchors.fill: parent
-                                    anchors.margins: 10
-                                    spacing: 4
+                                Item {
+                                    id: toastSlide
+                                    width: parent.width
+                                    height: parent.height
+                                    x: toastItem.slideOffset
 
-                                    Text {
-                                        text: model.summary
-                                        color: Theme.accent
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.toastTitleSize
-                                        font.weight: Theme.fontWeight
-                                        wrapMode: Text.Wrap
+                                    Behavior on x {
+                                        NumberAnimation {
+                                            duration: Theme.toastAnimDuration
+                                            easing.type: Easing.InOutSine
+                                        }
                                     }
 
-                                    Text {
-                                        text: model.body
-                                        color: Theme.textPrimary
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.toastBodySize
-                                        font.weight: Theme.fontWeight
-                                        wrapMode: Text.Wrap
+                                    Rectangle {
+                                        id: toastContent
+                                        width: parent.width
+                                        implicitHeight: toastTextColumn.implicitHeight + 20
+                                        radius: Theme.blockRadius
+                                        color: Theme.blockBg
+                                        border.width: 1
+                                        border.color: Theme.blockBorder
+
+                                        Column {
+                                            id: toastTextColumn
+                                            anchors.fill: parent
+                                            anchors.margins: 14
+                                            spacing: 6
+
+                                            Text {
+                                                text: toastItem.displayTitle
+                                                color: Theme.accent
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: Theme.toastTitleSize
+                                                font.weight: Theme.fontWeight
+                                                wrapMode: Text.Wrap
+                                            }
+
+                                            Text {
+                                                text: toastItem.displayBody
+                                                color: Theme.textPrimary
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: Theme.toastBodySize
+                                                font.weight: Theme.fontWeight
+                                                width: parent.width
+                                                wrapMode: Text.WrapAnywhere
+                                            }
+
+                                            Item {
+                                                width: parent.width
+                                                height: 8
+                                            }
+
+                                            Rectangle {
+                                                id: toastConfirmButton
+                                                width: parent.width
+                                                height: 28
+                                                radius: 6
+                                                color: Theme.accent
+
+                                                Text {
+                                                    id: confirmText
+                                                    anchors.centerIn: parent
+                                                    text: "확인"
+                                                    color: Theme.textOnAccent
+                                                    font.family: Theme.fontFamily
+                                                    font.pixelSize: Theme.fontSizeSmall
+                                                    font.weight: Theme.fontWeight
+                                                }
+
+                                                MouseArea {
+                                                    anchors.fill: parent
+                                                    hoverEnabled: true
+                                                    cursorShape: Qt.PointingHandCursor
+                                                    onClicked: toastItem.closing = true
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }

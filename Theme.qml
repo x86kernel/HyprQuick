@@ -22,9 +22,11 @@ Singleton {
     property int toastTitleSize: 16
     property int toastBodySize: 14
     property int toastWidth: 320
+    property int toastTitleMaxChars: 28
     property int toastGap: 8
     property int toastDuration: 3500
-    property int toastAnimDuration: 220
+    property int toastAnimDuration: 520
+    property int toastSlideOffset: 80
     property int fontWeight: Font.DemiBold
 
     property color blockBg: "#242438"
