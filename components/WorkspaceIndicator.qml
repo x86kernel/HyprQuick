@@ -6,7 +6,6 @@ import "."
 Item {
     id: root
     property var monitor: null
-    property int refreshIntervalMs: 1500
     property int stepDurationMs: 80
     property real highlightX: 0
     property real highlightY: 0
@@ -24,19 +23,31 @@ Item {
     implicitWidth: container.implicitWidth
 
     Timer {
-        interval: root.refreshIntervalMs
-        running: true
-        repeat: true
-        triggeredOnStart: true
-        onTriggered: Hyprland.refreshWorkspaces()
-    }
-
-
-    Timer {
         id: stepTimer
         interval: root.stepDurationMs
         repeat: true
         onTriggered: root.applyNextStep()
+    }
+
+    function requestWorkspaceRefresh() {
+        if (Hyprland.refreshWorkspaces) {
+            Hyprland.refreshWorkspaces()
+        }
+    }
+
+    Component.onCompleted: root.requestWorkspaceRefresh()
+
+    Connections {
+        target: Hyprland
+        function onActiveWorkspaceChanged() { root.requestWorkspaceRefresh() }
+    }
+
+    Instantiator {
+        id: workspaceModelWatcher
+        model: Hyprland.workspaces
+        delegate: QtObject {}
+        onObjectAdded: function() { root.requestWorkspaceRefresh() }
+        onObjectRemoved: function() { root.requestWorkspaceRefresh() }
     }
 
     function applyNextStep() {
@@ -226,7 +237,11 @@ Item {
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: workspace.activate()
+                        onClicked: {
+                            if (workspace && !workspace.focused) {
+                                workspace.activate()
+                            }
+                        }
                     }
 
                     Text {

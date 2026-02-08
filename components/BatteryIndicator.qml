@@ -7,6 +7,7 @@ Item {
     property int percent: 0
     property string state: "unknown"
     property bool available: true
+    property bool acOnline: false
 
     implicitHeight: container.implicitHeight
     implicitWidth: container.implicitWidth
@@ -21,6 +22,8 @@ Item {
                 pct = Number(line.replace(/[^0-9]/g, ""))
             } else if (line.indexOf("state:") === 0) {
                 st = line.split(":")[1].trim()
+            } else if (line.indexOf("online:") === 0) {
+                acOnline = line.split(":")[1].trim() === "yes"
             } else if (line === "NO_BATTERY") {
                 available = false
             }
@@ -36,7 +39,7 @@ Item {
 
     Process {
         id: battProc
-        command: ["sh", "-c", "p=$(upower -e | grep -m1 BAT); if [ -z \"$p\" ]; then echo NO_BATTERY; else upower -i \"$p\" | grep -E 'state:|percentage:'; fi"]
+        command: ["sh", "-c", "b=$(upower -e | grep -m1 BAT); a=$(upower -e | grep -m1 line_power); if [ -z \"$b\" ]; then echo NO_BATTERY; else upower -i \"$b\" | grep -E 'state:|percentage:'; if [ -n \"$a\" ]; then upower -i \"$a\" | grep -E 'online:'; fi; fi"]
         running: true
         stdout: StdioCollector {
             onStreamFinished: root.updateFromOutput(this.text)
@@ -51,9 +54,13 @@ Item {
     }
 
     function iconForState() {
-        if (state === "charging") return Theme.batteryIconCharging
+        if (acOnline && state === "charging") return Theme.batteryIconCharging
+        if (acOnline && state === "fully-charged") return Theme.batteryIconFull
+        if (acOnline) return Theme.batteryIconCharging
         if (state === "fully-charged") return Theme.batteryIconFull
-        return Theme.batteryIconDischarging
+        if (percent >= 80) return Theme.batteryIconDischargingHigh
+        if (percent >= 50) return Theme.batteryIconDischargingMid
+        return Theme.batteryIconDischargingLow
     }
 
     Rectangle {

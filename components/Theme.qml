@@ -17,7 +17,7 @@ Singleton {
     property int barReserveBottom: 0
 
     property string fontFamily: "SF Pro Text"
-    property string iconFontFamily: "Symbols Nerd Font"
+    property string iconFontFamily: "SauceCodePro Nerd Font"
     property int fontSize: 13
     property int fontSizeSmall: 12
     property int controllerFontSize: 15
@@ -29,6 +29,15 @@ Singleton {
     property int toastTitleMaxChars: 32
     property int toastGap: 8
     property int toastPadding: 14
+    property int toastTitleGap: 12
+    property int toastIconSize: 26
+    property int toastIconCircleSize: 40
+    property int toastBodyTopMargin: 4
+    property color toastIconBg: "#2c2c45"
+    property color toastIconBorder: "transparent"
+    property color toastIconShadow: "#0000005c"
+    property int toastIconShadowRadius: 20
+    property int toastIconShadowOffsetY: 3
     property int toastDuration: 3500
     property int toastAnimDuration: 520
     property int toastSlideOffset: 80
@@ -62,15 +71,38 @@ Singleton {
     property int wifiMaxWidth: 140
     property string wifiEmptyText: "No WiFi"
     property color wifiText: "#a6e3a1"
-    property int wifiPopupWidth: 480
+    property int wifiPopupWidth: 560
     property int wifiPopupPadding: 12
     property int wifiPopupRadius: 12
     property int wifiPopupOffset: 8
     property color wifiPopupBg: "#181826"
     property color wifiPopupBorder: "transparent"
     property int wifiSignalWidth: 40
+    property int wifiNetworkColumns: 2
+    property int wifiNetworkColumnSpacing: 12
+    property int wifiNetworkRowSpacing: 12
+    property string wifiSecureIcon: "󰌾"
+    property int wifiSecureIconWidth: 16
+    property string wifiConnectQuestion: "Connect to %1?"
+    property string wifiConnectYesText: "Yes"
+    property string wifiConnectNoText: "No"
+    property string wifiSecurityLabel: "Security"
+    property string wifiPasswordLabel: "Password"
+    property string wifiPasswordPlaceholder: "Enter password"
+    property var wifiSecurityOptions: ["Auto", "WPA-PSK", "WPA3-SAE", "WEP"]
+    property var wifiSecurityOptionValues: ["", "wpa-psk", "sae", "none"]
+    property int wifiConnectButtonHeight: 38
+    property int wifiConnectFieldHeight: 38
+    property int wifiConnectRadius: 10
+    property color wifiConnectFieldBg: "#1f1f30"
+    property color wifiConnectFieldBorder: "#2b2b42"
+    property color wifiConnectFieldBorderHover: "#3a3a5a"
+    property color wifiConnectFieldBgHover: "#24243a"
+    property color wifiConnectMutedText: "#9aa0b7"
     property string batteryIconCharging: "󰂄"
-    property string batteryIconDischarging: "󰁹"
+    property string batteryIconDischargingLow: "󰁺"
+    property string batteryIconDischargingMid: "󰁼"
+    property string batteryIconDischargingHigh: "󰁾"
     property string batteryIconFull: "󰁹"
     property int batteryPollInterval: 5000
     property string batteryUnavailableText: "--"
@@ -113,7 +145,7 @@ Singleton {
     property color otherMonitorText: "#cdd6f4"
 
     property int trayIconSize: 16
-    property int trayItemGap: 8
+    property int trayItemGap: 4
     property int trayMinWidth: 40
 
     property int popupWidth: 360

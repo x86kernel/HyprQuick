@@ -38,20 +38,29 @@ Item {
                 continue
             }
             var parts = line.split(":")
-            if (parts.length < 3) {
+            if (parts.length < 4) {
                 continue
             }
             var active = parts[0] === "yes"
             var ssidValue = parts[1]
-            var signal = Number(parts[2])
+            var securityValue = parts[2]
+            var signal = Number(parts[3])
             if (ssidValue.length === 0) {
                 continue
             }
-            list.push({ active: active, ssid: ssidValue, signal: signal })
+            var secure = securityValue.length > 0 && securityValue !== "--"
+            list.push({
+                active: active,
+                ssid: ssidValue,
+                security: securityValue,
+                signal: signal,
+                secure: secure
+            })
         }
         list.sort(function(a, b) {
-            if (a.active === b.active) return 0
-            return a.active ? -1 : 1
+            if (a.active !== b.active) return a.active ? -1 : 1
+            if (a.signal === b.signal) return 0
+            return a.signal > b.signal ? -1 : 1
         })
         networks = list
     }
@@ -67,7 +76,7 @@ Item {
 
     Process {
         id: wifiListProc
-        command: ["sh", "-c", "nmcli -t -f ACTIVE,SSID,SIGNAL dev wifi list"]
+        command: ["sh", "-c", "nmcli -t -f ACTIVE,SSID,SECURITY,SIGNAL dev wifi list"]
         running: false
         stdout: StdioCollector {
             onStreamFinished: root.updateNetworks(this.text)
@@ -120,11 +129,22 @@ Item {
         wifiRescanProc.running = true
     }
 
-    function connectTo(ssidValue) {
+    function escapeShell(value) {
+        return "\"" + value.replace(/\\/g, "\\\\").replace(/\"/g, "\\\"") + "\""
+    }
+
+    function connectTo(ssidValue, passwordValue, securityValue) {
         if (!ssidValue || ssidValue.length === 0) {
             return
         }
-        wifiConnectProc.command = ["sh", "-c", "nmcli dev wifi connect \"" + ssidValue.replace(/\"/g, '\\\\\"') + "\""]
+        var cmd = "nmcli dev wifi connect " + escapeShell(ssidValue)
+        if (passwordValue && passwordValue.length > 0) {
+            cmd += " password " + escapeShell(passwordValue)
+        }
+        if (securityValue && securityValue.length > 0) {
+            cmd += " wifi-sec.key-mgmt " + escapeShell(securityValue)
+        }
+        wifiConnectProc.command = ["sh", "-c", cmd]
         wifiConnectProc.running = true
     }
 
