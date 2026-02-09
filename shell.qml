@@ -753,6 +753,10 @@ ShellRoot {
                             parentWindow: bar
                         }
 
+                        VolumeIndicator {
+                            id: volumeIndicator
+                        }
+
                         ClipboardIndicator {
                             id: clipboardIndicator
                         }

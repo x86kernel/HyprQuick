@@ -96,6 +96,13 @@ Singleton {
     property int wifiMaxWidth: 140
     property string wifiEmptyText: "No WiFi"
     property color wifiText: "#a6e3a1"
+    property string volumeIcon: "󰕾"
+    property string volumeMutedIcon: "󰖁"
+    property string volumeUnknownIcon: "󰖀"
+    property string volumeUnavailableText: "--"
+    property int volumePollInterval: 2000
+    property int volumeStepPercent: 5
+    property color volumeText: "#f5c2e7"
     property int wifiPopupWidth: 560
     property int wifiPopupPadding: 12
     property int wifiPopupRadius: 12
