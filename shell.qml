@@ -8,6 +8,7 @@ import Quickshell.Hyprland
 import Quickshell.Services.Notifications
 import Quickshell.Widgets
 import Quickshell.Wayland
+import Quickshell.Io
 import "components"
 
 ShellRoot {
@@ -163,11 +164,69 @@ ShellRoot {
                 wifiPopup.anchor.rect.height = 1
             }
 
+            function shellQuote(text) {
+                return "'" + (text || "").replace(/'/g, "'\\''") + "'"
+            }
+
+            function commandWithFile(template, path) {
+                return (template || "").replace(/%FILE%/g, shellQuote(path || ""))
+            }
+
+            function openScreenshotPreview(path) {
+                if (!path || path.length === 0) {
+                    return
+                }
+                if (screenshotPopup.tempPath.length > 0 && screenshotPopup.tempPath !== path) {
+                    screenshotDiscardProc.commandText = commandWithFile(Theme.screenshotDiscardCommandTemplate, screenshotPopup.tempPath)
+                    screenshotDiscardProc.running = true
+                }
+                bluetoothPopup.open = false
+                wifiPopup.open = false
+                cpuPopup.open = false
+                notificationPopup.open = false
+                screenshotPopup.errorText = ""
+                screenshotPopup.tempPath = path
+                screenshotPopup.open = true
+            }
+
+            function closeScreenshotPreview(removeTempFile) {
+                var path = screenshotPopup.tempPath
+                screenshotPopup.open = false
+                screenshotPopup.tempPath = ""
+                screenshotPopup.errorText = ""
+                if (removeTempFile && path && path.length > 0) {
+                    screenshotDiscardProc.commandText = commandWithFile(Theme.screenshotDiscardCommandTemplate, path)
+                    screenshotDiscardProc.running = true
+                }
+            }
+
+            Process {
+                id: screenshotSaveProc
+                property string commandText: ""
+                command: ["sh", "-c", commandText]
+                running: false
+            }
+
+            Process {
+                id: screenshotCopyProc
+                property string commandText: ""
+                command: ["sh", "-c", commandText]
+                running: false
+            }
+
+            Process {
+                id: screenshotDiscardProc
+                property string commandText: ""
+                command: ["sh", "-c", commandText]
+                running: false
+            }
+
             function closeControllers() {
                 bluetoothPopup.open = false
                 wifiPopup.open = false
                 cpuPopup.open = false
                 notificationPopup.open = false
+                closeScreenshotPreview(true)
             }
 
             function toggleBluetoothController() {
@@ -178,6 +237,7 @@ ShellRoot {
                 wifiPopup.open = false
                 cpuPopup.open = false
                 notificationPopup.open = false
+                closeScreenshotPreview(true)
                 bluetoothPopup.open = true
             }
 
@@ -189,6 +249,7 @@ ShellRoot {
                 bluetoothPopup.open = false
                 cpuPopup.open = false
                 notificationPopup.open = false
+                closeScreenshotPreview(true)
                 wifiPopup.open = true
             }
 
@@ -200,6 +261,7 @@ ShellRoot {
                 bluetoothPopup.open = false
                 wifiPopup.open = false
                 notificationPopup.open = false
+                closeScreenshotPreview(true)
                 cpuPopup.open = true
             }
 
@@ -211,7 +273,41 @@ ShellRoot {
                 bluetoothPopup.open = false
                 wifiPopup.open = false
                 cpuPopup.open = false
+                closeScreenshotPreview(true)
                 notificationPopup.open = true
+            }
+
+            function clearTrackedNotifications() {
+                var notifications = []
+                if (!notificationServer.trackedNotifications) {
+                    return
+                }
+                if (notificationServer.trackedNotifications.values !== undefined) {
+                    notifications = notificationServer.trackedNotifications.values
+                } else {
+                    notifications = notificationServer.trackedNotifications
+                }
+                for (var i = 0; i < notifications.length; i += 1) {
+                    var entry = notifications[i]
+                    markNotificationRead(entry)
+                }
+            }
+
+            function markNotificationRead(notification) {
+                if (!notification) {
+                    return
+                }
+                if (notification.tracked !== undefined) {
+                    notification.tracked = false
+                    return
+                }
+                if (notification.dismiss) {
+                    notification.dismiss()
+                    return
+                }
+                if (notification.close) {
+                    notification.close()
+                }
             }
 
             HyprlandFocusGrab {
@@ -312,16 +408,51 @@ ShellRoot {
                             id: notificationTrigger
                             count: notificationCount()
                             onClicked: bar.toggleNotificationCenter()
+                            onRightClicked: {
+                                if (notificationCount() > 0) {
+                                    bar.clearTrackedNotifications()
+                                }
+                            }
                             fixedWidth: bluetoothIndicator.implicitWidth
                         }
                     }
                 }
             }
 
-            DateTimeIndicator {
-                id: dateTimeIndicator
+            Row {
+                id: centerCluster
                 anchors.horizontalCenter: parent.horizontalCenter
                 anchors.verticalCenter: parent.verticalCenter
+                spacing: Theme.blockGap
+
+                VpnIndicator {
+                    id: vpnIndicator
+                }
+
+                DateTimeIndicator {
+                    id: dateTimeIndicator
+                }
+
+                ScreenCaptureIndicator {
+                    id: screenCaptureIndicator
+                    onCaptureCompleted: function(filePath) {
+                        bar.openScreenshotPreview(filePath)
+                    }
+                    onCaptureFailed: function(reason) {
+                        if (reason === "cancelled") {
+                            bar.closeScreenshotPreview(true)
+                            return
+                        }
+                        bar.appendToast({
+                            summary: "Screenshot Failed",
+                            body: reason,
+                            appName: "QuickShell"
+                        })
+                        screenshotPopup.tempPath = ""
+                        screenshotPopup.errorText = reason
+                        screenshotPopup.open = true
+                    }
+                }
             }
 
             PanelWindow {
@@ -1541,12 +1672,196 @@ ShellRoot {
             }
 
             PopupWindow {
+                id: screenshotPopup
+                implicitWidth: Theme.screenshotPopupWidth
+                implicitHeight: Theme.screenshotPopupHeight
+                property bool open: false
+                property real anim: open ? 1 : 0
+                property string tempPath: ""
+                property string errorText: ""
+                visible: open || anim > 0.01
+                Behavior on anim { NumberAnimation { duration: Theme.controllerAnimMs; easing.type: Easing.OutCubic } }
+                color: "transparent"
+                anchor.window: bar
+                anchor.rect.x: (bar.width - width) / 2
+                anchor.rect.y: bar.height + Theme.popupOffset
+
+                Rectangle {
+                    anchors.fill: parent
+                    radius: Theme.screenshotPopupRadius
+                    color: Theme.popupBg
+                    border.width: 1
+                    border.color: Theme.popupBorder
+                    opacity: screenshotPopup.anim
+                    scale: 0.98 + 0.02 * screenshotPopup.anim
+
+                    Column {
+                        anchors.fill: parent
+                        anchors.margins: Theme.screenshotPopupPadding
+                        spacing: Theme.screenshotPopupGap
+
+                        Text {
+                            id: screenshotTitleLabel
+                            text: Theme.screenshotTitle
+                            color: Theme.textPrimary
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.controllerFontSize
+                            font.weight: Theme.fontWeight
+                        }
+
+                        Rectangle {
+                            width: parent.width
+                            height: Math.max(
+                                90,
+                                parent.height - screenshotTitleLabel.implicitHeight - actionsRow.height - (Theme.screenshotPopupGap * 2)
+                            )
+                            radius: Theme.blockRadius
+                            color: Theme.blockBg
+                            border.width: 1
+                            border.color: Theme.blockBorder
+                            clip: true
+
+                            Image {
+                                anchors.fill: parent
+                                anchors.margins: 6
+                                fillMode: Image.PreserveAspectFit
+                                smooth: true
+                                mipmap: true
+                                asynchronous: true
+                                source: screenshotPopup.tempPath.length > 0 ? ("file://" + screenshotPopup.tempPath) : ""
+                                visible: screenshotPopup.tempPath.length > 0
+                            }
+
+                            Text {
+                                anchors.centerIn: parent
+                                width: parent.width - 24
+                                visible: screenshotPopup.tempPath.length === 0 && screenshotPopup.errorText.length > 0
+                                text: screenshotPopup.errorText
+                                horizontalAlignment: Text.AlignHCenter
+                                wrapMode: Text.Wrap
+                                color: Theme.textPrimary
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.controllerFontSizeSmall
+                            }
+                        }
+
+                        Row {
+                            id: actionsRow
+                            width: parent.width
+                            spacing: Theme.screenshotPopupGap
+
+                            Rectangle {
+                                width: (parent.width - Theme.screenshotPopupGap * 2) / 3
+                                height: Theme.screenshotActionButtonHeight
+                                radius: Theme.wifiConnectRadius
+                                color: Theme.accent
+
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: Theme.screenshotSaveText
+                                    color: Theme.textOnAccent
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: Theme.controllerFontSizeSmall
+                                    font.weight: Theme.fontWeight
+                                }
+
+                                MouseArea {
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        if (screenshotPopup.tempPath.length === 0) {
+                                            bar.closeScreenshotPreview(false)
+                                            return
+                                        }
+                                        screenshotSaveProc.commandText = bar.commandWithFile(
+                                            Theme.screenshotSaveCommandTemplate + "; " + Theme.screenshotDiscardCommandTemplate,
+                                            screenshotPopup.tempPath
+                                        )
+                                        screenshotSaveProc.running = true
+                                        bar.closeScreenshotPreview(false)
+                                    }
+                                }
+                            }
+
+                            Rectangle {
+                                width: (parent.width - Theme.screenshotPopupGap * 2) / 3
+                                height: Theme.screenshotActionButtonHeight
+                                radius: Theme.wifiConnectRadius
+                                color: Theme.blockBg
+                                border.width: 1
+                                border.color: Theme.blockBorder
+
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: Theme.screenshotCopyText
+                                    color: Theme.textPrimary
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: Theme.controllerFontSizeSmall
+                                    font.weight: Theme.fontWeight
+                                }
+
+                                MouseArea {
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        if (screenshotPopup.tempPath.length === 0) {
+                                            bar.closeScreenshotPreview(false)
+                                            return
+                                        }
+                                        screenshotCopyProc.commandText = bar.commandWithFile(
+                                            Theme.screenshotCopyCommandTemplate + "; " + Theme.screenshotDiscardCommandTemplate,
+                                            screenshotPopup.tempPath
+                                        )
+                                        screenshotCopyProc.running = true
+                                        bar.closeScreenshotPreview(false)
+                                    }
+                                }
+                            }
+
+                            Rectangle {
+                                width: (parent.width - Theme.screenshotPopupGap * 2) / 3
+                                height: Theme.screenshotActionButtonHeight
+                                radius: Theme.wifiConnectRadius
+                                color: Theme.blockBg
+                                border.width: 1
+                                border.color: Theme.blockBorder
+
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: Theme.screenshotCloseText
+                                    color: Theme.textPrimary
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: Theme.controllerFontSizeSmall
+                                    font.weight: Theme.fontWeight
+                                }
+
+                                MouseArea {
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: bar.closeScreenshotPreview(true)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            PopupWindow {
                 id: notificationPopup
                 implicitWidth: Theme.popupWidth
                 property int maxHeight: bar.screen
                     ? Math.max(200, bar.screen.height - (bar.height + Theme.popupOffset + Theme.barMarginTop + Theme.popupBottomMargin))
                     : Theme.popupHeight
-                implicitHeight: Math.min(maxHeight, listColumn.implicitHeight + Theme.popupPadding * 2)
+                implicitHeight: Math.min(
+                    maxHeight,
+                    Math.max(
+                        listColumn.implicitHeight,
+                        notificationCount() === 0 ? Theme.notificationEmptyMinHeight : 0
+                    ) + Theme.popupPadding * 2
+                )
                 property bool open: false
                 property real anim: open ? 1 : 0
                 visible: open || anim > 0.01
@@ -1569,6 +1884,7 @@ ShellRoot {
                         id: notificationList
                         anchors.fill: parent
                         anchors.margins: Theme.popupPadding
+                        visible: notificationCount() > 0
                         contentWidth: width
                         contentHeight: listColumn.implicitHeight
                         clip: true
@@ -1577,14 +1893,6 @@ ShellRoot {
                             id: listColumn
                             spacing: Theme.toastGap
                             width: parent.width
-
-                            Text {
-                                text: "Notifications"
-                                color: Theme.textPrimary
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.controllerFontSize
-                                font.weight: Font.DemiBold
-                            }
 
                             Repeater {
                                 model: notificationServer.trackedNotifications.values !== undefined
@@ -1724,9 +2032,7 @@ ShellRoot {
                                                 hoverEnabled: true
                                                 cursorShape: Qt.PointingHandCursor
                                                 onClicked: {
-                                                    if (modelData && modelData.close) {
-                                                        modelData.close()
-                                                    }
+                                                    bar.markNotificationRead(modelData)
                                                 }
                                             }
                                         }
@@ -1734,12 +2040,34 @@ ShellRoot {
                                 }
                             }
 
+                        }
+                    }
+
+                    Item {
+                        anchors.fill: parent
+                        anchors.margins: Theme.popupPadding
+                        visible: notificationCount() === 0
+
+                        ColumnLayout {
+                            anchors.centerIn: parent
+                            spacing: 10
+
+                            AnimatedImage {
+                                Layout.alignment: Qt.AlignHCenter
+                                source: Qt.resolvedUrl("assets/bongocat.gif")
+                                fillMode: Image.PreserveAspectFit
+                                width: Theme.notificationEmptyGifSize
+                                height: Theme.notificationEmptyGifSize
+                                playing: true
+                            }
+
                             Text {
-                                visible: notificationCount() === 0
-                                text: "No notifications"
+                                Layout.alignment: Qt.AlignHCenter
+                                text: Theme.notificationEmptyText
                                 color: Theme.textPrimary
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Theme.controllerFontSizeSmall
+                                horizontalAlignment: Text.AlignHCenter
                             }
                         }
                     }

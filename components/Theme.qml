@@ -43,6 +43,22 @@ Singleton {
     property int toastSlideOffset: 80
     property int fontWeight: Font.DemiBold
     property string notificationIcon: "󰂚"
+    property string screenshotIcon: "󰄀"
+    property string screenshotCaptureCommand: "for c in slurp grim; do command -v \"$c\" >/dev/null 2>&1 || { printf '__QSERR__ missing:%s\\n' \"$c\"; exit 0; }; done; tmp=\"$(mktemp /tmp/qs-shot-XXXXXX.png)\"; slurp_out=\"$(slurp 2>&1)\"; slurp_status=$?; if [ \"$slurp_status\" -ne 0 ]; then rm -f \"$tmp\"; printf '__QSERR__ slurp-failed:%s\\n' \"$slurp_out\"; exit 0; fi; region=\"$slurp_out\"; grim_err=\"$(grim -g \"$region\" \"$tmp\" 2>&1)\"; grim_status=$?; if [ \"$grim_status\" -ne 0 ] || [ ! -s \"$tmp\" ]; then rm -f \"$tmp\"; printf '__QSERR__ grim-failed:%s\\n' \"$grim_err\"; exit 0; fi; printf '%s\\n' \"$tmp\""
+    property string screenshotSaveCommandTemplate: "mkdir -p \"$HOME/Pictures/Screenshots\"; cp %FILE% \"$HOME/Pictures/Screenshots/$(date +%Y-%m-%d_%H-%M-%S).png\""
+    property string screenshotCopyCommandTemplate: "wl-copy < %FILE%"
+    property string screenshotDiscardCommandTemplate: "rm -f %FILE%"
+    property int screenshotPopupWidth: 560
+    property int screenshotPopupHeight: 380
+    property int screenshotPopupRadius: 14
+    property int screenshotPopupPadding: 14
+    property int screenshotPopupGap: 10
+    property int screenshotActionButtonHeight: 38
+    property string screenshotTitle: "Screenshot Preview"
+    property string screenshotSelectingText: "Select an area to capture..."
+    property string screenshotSaveText: "Save"
+    property string screenshotCopyText: "Copy"
+    property string screenshotCloseText: "Close"
     property string notificationFallbackIcon: "󰂚"
     property string cpuIcon: "󰍛"
     property int cpuPollInterval: 2000
@@ -107,6 +123,9 @@ Singleton {
     property int batteryPollInterval: 5000
     property string batteryUnavailableText: "--"
     property color batteryText: "#f5c2e7"
+    property string vpnIcon: ""
+    property int vpnPollInterval: 3000
+    property color vpnText: "#cba6f7"
     property int cpuTooltipWidth: 220
     property int cpuTooltipPadding: 10
     property int cpuTooltipRadius: 10
@@ -156,6 +175,9 @@ Singleton {
     property int popupOffset: 8
     property color popupBg: "#181826"
     property color popupBorder: "transparent"
+    property int notificationEmptyMinHeight: 220
+    property int notificationEmptyGifSize: 96
+    property string notificationEmptyText: "알림이 없습니다"
     property int controllerAnimMs: 160
     property string mediaIcon: "󰝚"
     property int mediaPollInterval: 1200

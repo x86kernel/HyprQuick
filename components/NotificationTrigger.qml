@@ -6,6 +6,7 @@ Item {
     property int count: 0
     property int fixedWidth: 0
     signal clicked
+    signal rightClicked
 
     implicitHeight: container.implicitHeight
     implicitWidth: container.implicitWidth
@@ -35,8 +36,15 @@ Item {
         MouseArea {
             anchors.fill: parent
             hoverEnabled: true
+            acceptedButtons: Qt.LeftButton | Qt.RightButton
             cursorShape: Qt.PointingHandCursor
-            onClicked: root.clicked()
+            onClicked: function(mouse) {
+                if (mouse.button === Qt.RightButton) {
+                    root.rightClicked()
+                    return
+                }
+                root.clicked()
+            }
         }
     }
 }
