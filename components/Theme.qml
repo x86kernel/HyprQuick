@@ -33,11 +33,20 @@ Singleton {
     property int toastIconSize: 26
     property int toastIconCircleSize: 40
     property int toastBodyTopMargin: 4
+    property int toastCardRadius: 12
+    property color toastCardBg: "#242438"
+    property color toastCardBorder: "#000000"
+    property color toastTitleText: "#f5c2e7"
+    property color toastBodyText: "#cdd6f4"
     property color toastIconBg: "#2c2c45"
     property color toastIconBorder: "transparent"
     property color toastIconShadow: "#0000005c"
     property int toastIconShadowRadius: 20
     property int toastIconShadowOffsetY: 3
+    property color toastCardShadow: "#000000b3"
+    property int toastCardShadowRadius: 20
+    property int toastCardShadowOffsetY: 8
+    property int toastCardShadowPadding: 14
     property int toastDuration: 3500
     property int toastAnimDuration: 520
     property int toastSlideOffset: 80
@@ -175,6 +184,40 @@ Singleton {
     property int popupOffset: 8
     property color popupBg: "#181826"
     property color popupBorder: "transparent"
+    property int dateWidgetPopupWidth: 640
+    property int dateWidgetPopupHeight: 330
+    property int dateWidgetPopupRadius: 14
+    property int dateWidgetPopupPadding: 14
+    property int dateWidgetPopupPaddingY: 14
+    property int dateWidgetPopupGap: 10
+    property int dateWidgetPopupOffset: 8
+    property int dateWidgetNavButtonSize: 28
+    property int dateWidgetCalendarGap: 6
+    property int dateWidgetCalendarCellHeight: 28
+    property color holidayTextColor: "#ff9ac1"
+    property color holidayDotColor: "#ff6da8"
+    property int holidayDotSize: 5
+    property int weatherPollInterval: 900000
+    property int weatherMinRefreshMs: 120000
+    property int weatherOpenRefreshMs: 600000
+    property string weatherUpdatedFormat: "MM/dd HH:mm"
+    property string weatherSectionTitle: "Weather"
+    property string weatherLocationPrefix: "Location"
+    property string weatherFeelsLikeLabel: "Feels"
+    property string weatherHumidityLabel: "Humidity"
+    property string weatherWindLabel: "Wind"
+    property string weatherUpdatedPrefix: "Updated"
+    property string weatherErrorPrefix: "Weather error:"
+    property string weatherLoadingText: "날씨 정보를 불러오는 중..."
+    property string weatherUnavailableText: "날씨 정보를 불러올 수 없음"
+    property int weatherIllustrationSize: 128
+    property int weatherIllustrationRadius: 16
+    property color weatherIllustrationBg: "#2a223a"
+    property color weatherIllustrationBorder: "#ffffff22"
+    property int weatherIllustrationMargin: 2
+    property int weatherIllustrationImageSize: 148
+    property int weatherIllustrationTopMargin: Math.max(0, Math.ceil((weatherIllustrationImageSize - weatherIllustrationSize) / 2))
+    property real weatherIllustrationScale: 1.0
     property int notificationEmptyMinHeight: 220
     property int notificationEmptyGifSize: 96
     property string notificationEmptyText: "알림이 없습니다"

@@ -4,6 +4,7 @@ import "."
 
 Item {
     id: root
+    signal clicked
 
     implicitHeight: container.implicitHeight
     implicitWidth: container.implicitWidth
@@ -33,6 +34,13 @@ Item {
             font.family: Theme.fontFamily
             font.pixelSize: Theme.fontSize
             font.weight: Theme.fontWeight
+        }
+
+        MouseArea {
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: root.clicked()
         }
     }
 }

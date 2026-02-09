@@ -62,9 +62,284 @@ ShellRoot {
 
             property int maxToasts: 10
             property int toastCounter: 0
+            property var calendarMonthDate: new Date()
+            property var calendarCells: []
+            property var calendarDayNames: ["일", "월", "화", "수", "목", "금", "토"]
+            property var appSettings: defaultSettings()
+            property string settingsFileUrl: Qt.resolvedUrl("settings.json")
+            property string settingsFilePath: settingsFileUrl.indexOf("file://") === 0
+                ? decodeURIComponent(settingsFileUrl.slice(7))
+                : settingsFileUrl
+            property var holidayMap: ({})
+            property string holidayLoadedKey: ""
+            property string weatherCondition: Theme.weatherLoadingText
+            property string weatherTemperature: "--"
+            property string weatherFeelsLike: "--"
+            property string weatherHumidity: "--"
+            property string weatherWind: "--"
+            property string weatherIconUrl: ""
+            property string weatherLocationText: "--"
+            property string weatherUpdatedAt: ""
+            property string weatherError: ""
+            property double weatherLastFetchMs: 0
 
             ListModel {
                 id: toastModel
+            }
+
+            function defaultSettings() {
+                return {
+                    weatherApiKey: "",
+                    weatherLocation: "auto:ip",
+                    holidayCountryCode: "KR"
+                }
+            }
+
+            function normalizedSettings(raw) {
+                var defaults = defaultSettings()
+                var next = raw || {}
+                return {
+                    weatherApiKey: String(next.weatherApiKey !== undefined ? next.weatherApiKey : defaults.weatherApiKey),
+                    weatherLocation: String(next.weatherLocation !== undefined ? next.weatherLocation : defaults.weatherLocation),
+                    holidayCountryCode: String(next.holidayCountryCode !== undefined ? next.holidayCountryCode : defaults.holidayCountryCode).toUpperCase()
+                }
+            }
+
+            function applySettingsText(text) {
+                var trimmed = (text || "").trim()
+                if (trimmed.length === 0) {
+                    appSettings = normalizedSettings({})
+                    return
+                }
+                try {
+                    appSettings = normalizedSettings(JSON.parse(trimmed))
+                } catch (e) {
+                    appSettings = normalizedSettings({})
+                }
+            }
+
+            function loadSettings() {
+                settingsReadProc.commandText = "if [ -f " + shellQuote(settingsFilePath) + " ]; then cat " + shellQuote(settingsFilePath)
+                    + "; else printf '{}' ; fi"
+                settingsReadProc.running = true
+            }
+
+            function saveSettings() {
+                var payload = JSON.stringify(appSettings, null, 2)
+                settingsWriteProc.commandText = "printf '%s\\n' " + shellQuote(payload) + " > " + shellQuote(settingsFilePath)
+                settingsWriteProc.running = true
+            }
+
+            function updateSetting(key, value) {
+                var next = {
+                    weatherApiKey: appSettings.weatherApiKey,
+                    weatherLocation: appSettings.weatherLocation,
+                    holidayCountryCode: appSettings.holidayCountryCode
+                }
+                next[key] = value
+                appSettings = normalizedSettings(next)
+                saveSettings()
+                if (key === "holidayCountryCode") {
+                    holidayLoadedKey = ""
+                    ensureHolidayYear(calendarMonthDate.getFullYear())
+                }
+                if (key === "weatherApiKey" || key === "weatherLocation") {
+                    refreshWeather(true)
+                }
+            }
+
+            function normalizedMonthDate(d) {
+                return new Date(d.getFullYear(), d.getMonth(), 1)
+            }
+
+            function buildCalendarCells(referenceDate) {
+                var firstDay = new Date(referenceDate.getFullYear(), referenceDate.getMonth(), 1)
+                var startOffset = firstDay.getDay()
+                var gridStart = new Date(firstDay.getFullYear(), firstDay.getMonth(), 1 - startOffset)
+                var cells = []
+                var today = new Date()
+                var selectedMonth = referenceDate.getMonth()
+                for (var i = 0; i < 42; i += 1) {
+                    var cellDate = new Date(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate() + i)
+                    var isToday = cellDate.getFullYear() === today.getFullYear()
+                        && cellDate.getMonth() === today.getMonth()
+                        && cellDate.getDate() === today.getDate()
+                    var key = isoDateKey(cellDate.getFullYear(), cellDate.getMonth() + 1, cellDate.getDate())
+                    var holidayName = holidayMap[key] || ""
+                    cells.push({
+                        day: cellDate.getDate(),
+                        isCurrentMonth: cellDate.getMonth() === selectedMonth,
+                        isToday: isToday,
+                        isHoliday: holidayName.length > 0,
+                        holidayName: holidayName
+                    })
+                }
+                return cells
+            }
+
+            function rebuildCalendar() {
+                calendarCells = buildCalendarCells(calendarMonthDate)
+            }
+
+            function setCalendarMonthOffset(offset) {
+                calendarMonthDate = new Date(calendarMonthDate.getFullYear(), calendarMonthDate.getMonth() + offset, 1)
+                ensureHolidayYear(calendarMonthDate.getFullYear())
+                rebuildCalendar()
+            }
+
+            function resetCalendarToCurrentMonth() {
+                calendarMonthDate = normalizedMonthDate(new Date())
+                ensureHolidayYear(calendarMonthDate.getFullYear())
+                rebuildCalendar()
+            }
+
+            function isoDateKey(year, month, day) {
+                function pad2(v) {
+                    return v < 10 ? "0" + v : String(v)
+                }
+                return String(year) + "-" + pad2(month) + "-" + pad2(day)
+            }
+
+            function buildHolidayCommand(year, countryCode) {
+                var country = (countryCode || "KR").toUpperCase()
+                var url = "https://date.nager.at/api/v3/PublicHolidays/" + String(year) + "/" + country
+                return "if command -v curl >/dev/null 2>&1; then curl -fsS --max-time 8 '" + url + "'; " +
+                    "elif command -v wget >/dev/null 2>&1; then wget -qO- '" + url + "'; " +
+                    "else printf '__QSERR__ missing:curl-or-wget\\n'; fi"
+            }
+
+            function ensureHolidayYear(year) {
+                var country = (appSettings.holidayCountryCode || "KR").toUpperCase()
+                var key = String(year) + "-" + country
+                if (holidayLoadedKey === key || holidayProc.running) {
+                    return
+                }
+                holidayProc.requestYear = year
+                holidayProc.requestCountry = country
+                holidayProc.command = ["sh", "-c", buildHolidayCommand(year, country)]
+                holidayProc.running = true
+            }
+
+            function parseHolidayOutput(rawText, year, country) {
+                var text = (rawText || "").trim()
+                if (text.length === 0 || text.indexOf("__QSERR__") === 0) {
+                    return
+                }
+                var list = null
+                try {
+                    list = JSON.parse(text)
+                } catch (e) {
+                    return
+                }
+                if (!Array.isArray(list)) {
+                    return
+                }
+                var map = {}
+                for (var i = 0; i < list.length; i += 1) {
+                    var entry = list[i] || {}
+                    var dateKey = (entry.date || "").trim()
+                    if (dateKey.length === 0) {
+                        continue
+                    }
+                    map[dateKey] = (entry.localName || entry.name || "").trim()
+                }
+                holidayMap = map
+                holidayLoadedKey = String(year) + "-" + String(country).toUpperCase()
+                rebuildCalendar()
+            }
+
+            function buildWeatherCommand() {
+                var apiKey = (appSettings.weatherApiKey || "").trim()
+                if (apiKey.length === 0) {
+                    return "printf '__QSERR__ missing:weatherapi-key\\n'"
+                }
+                var location = appSettings.weatherLocation && appSettings.weatherLocation.length > 0
+                    ? appSettings.weatherLocation
+                    : "auto:ip"
+                var encodedLocation = encodeURIComponent(location)
+                var url = "https://api.weatherapi.com/v1/current.json?key="
+                    + encodeURIComponent(apiKey)
+                    + "&q=" + encodedLocation
+                    + "&aqi=no"
+                return "if command -v curl >/dev/null 2>&1; then curl -fsS --max-time 6 '" + url + "'; " +
+                    "elif command -v wget >/dev/null 2>&1; then wget -qO- '" + url + "'; " +
+                    "else printf '__QSERR__ missing:curl-or-wget\\n'; fi"
+            }
+
+            function parseWeatherOutput(rawText) {
+                var text = (rawText || "").trim()
+                weatherLastFetchMs = Date.now()
+                weatherUpdatedAt = Qt.formatDateTime(new Date(), Theme.weatherUpdatedFormat)
+                weatherError = ""
+                if (text.length === 0) {
+                    weatherCondition = Theme.weatherUnavailableText
+                    weatherTemperature = "--"
+                    weatherFeelsLike = "--"
+                    weatherHumidity = "--"
+                    weatherWind = "--"
+                    weatherIconUrl = ""
+                    weatherLocationText = "--"
+                    weatherError = Theme.weatherUnavailableText
+                    return
+                }
+                if (text.indexOf("__QSERR__") === 0) {
+                    weatherCondition = Theme.weatherUnavailableText
+                    weatherTemperature = "--"
+                    weatherFeelsLike = "--"
+                    weatherHumidity = "--"
+                    weatherWind = "--"
+                    weatherIconUrl = ""
+                    weatherLocationText = "--"
+                    weatherError = text.replace("__QSERR__", "").trim()
+                    return
+                }
+                var payload = null
+                try {
+                    payload = JSON.parse(text)
+                } catch (e) {
+                    weatherCondition = Theme.weatherUnavailableText
+                    weatherTemperature = "--"
+                    weatherFeelsLike = "--"
+                    weatherHumidity = "--"
+                    weatherWind = "--"
+                    weatherIconUrl = ""
+                    weatherLocationText = "--"
+                    weatherError = Theme.weatherUnavailableText
+                    return
+                }
+                if (payload.error) {
+                    weatherCondition = Theme.weatherUnavailableText
+                    weatherTemperature = "--"
+                    weatherFeelsLike = "--"
+                    weatherHumidity = "--"
+                    weatherWind = "--"
+                    weatherIconUrl = ""
+                    weatherLocationText = "--"
+                    weatherError = payload.error.message || Theme.weatherUnavailableText
+                    return
+                }
+                var location = payload.location || {}
+                var current = payload.current || {}
+                var condition = current.condition || {}
+                weatherCondition = (condition.text || Theme.weatherUnavailableText).trim()
+                weatherTemperature = current.temp_c !== undefined ? (Math.round(Number(current.temp_c)) + "°C") : "--"
+                weatherFeelsLike = current.feelslike_c !== undefined ? (Math.round(Number(current.feelslike_c)) + "°C") : "--"
+                weatherHumidity = current.humidity !== undefined ? (String(current.humidity) + "%") : "--"
+                weatherWind = current.wind_kph !== undefined ? (String(Math.round(Number(current.wind_kph))) + " km/h") : "--"
+                var locName = (location.name || "").trim()
+                var locRegion = (location.region || "").trim()
+                var locCountry = (location.country || "").trim()
+                var locationParts = []
+                if (locName.length > 0) locationParts.push(locName)
+                if (locRegion.length > 0 && locRegion !== locName) locationParts.push(locRegion)
+                if (locCountry.length > 0) locationParts.push(locCountry)
+                weatherLocationText = locationParts.length > 0 ? locationParts.join(", ") : "--"
+                var iconPath = condition.icon || ""
+                if (iconPath.indexOf("//") === 0) {
+                    iconPath = "https:" + iconPath
+                }
+                iconPath = iconPath.replace("/64x64/", "/128x128/")
+                weatherIconUrl = iconPath
             }
 
             function normalizeNotificationText(text) {
@@ -79,6 +354,7 @@ ShellRoot {
                 if (bar.WlrLayershell) {
                     bar.WlrLayershell.keyboardFocus = WlrKeyboardFocus.OnDemand
                 }
+                loadSettings()
             }
 
             function resolveNotificationIcon(iconValue) {
@@ -164,6 +440,21 @@ ShellRoot {
                 wifiPopup.anchor.rect.height = 1
             }
 
+            function updateDateWidgetPopupAnchor() {
+                if (!dateTimeIndicator) {
+                    return
+                }
+                var anchorItem = bar.contentItem ? bar.contentItem : bar
+                var pos = dateTimeIndicator.mapToItem(anchorItem, 0, dateTimeIndicator.height)
+                var x = pos.x + (dateTimeIndicator.width - Theme.dateWidgetPopupWidth) / 2
+                var minX = Theme.barMarginX
+                var maxX = Math.max(minX, bar.width - Theme.dateWidgetPopupWidth - Theme.barMarginX)
+                dateWidgetPopup.anchor.rect.x = Math.min(maxX, Math.max(minX, x))
+                dateWidgetPopup.anchor.rect.y = pos.y + Theme.dateWidgetPopupOffset
+                dateWidgetPopup.anchor.rect.width = 1
+                dateWidgetPopup.anchor.rect.height = 1
+            }
+
             function shellQuote(text) {
                 return "'" + (text || "").replace(/'/g, "'\\''") + "'"
             }
@@ -184,6 +475,7 @@ ShellRoot {
                 wifiPopup.open = false
                 cpuPopup.open = false
                 notificationPopup.open = false
+                dateWidgetPopup.open = false
                 screenshotPopup.errorText = ""
                 screenshotPopup.tempPath = path
                 screenshotPopup.open = true
@@ -221,11 +513,75 @@ ShellRoot {
                 running: false
             }
 
+            Process {
+                id: settingsReadProc
+                property string commandText: ""
+                command: ["sh", "-c", commandText]
+                running: false
+                stdout: StdioCollector {
+                    onStreamFinished: {
+                        bar.applySettingsText(this.text)
+                        bar.saveSettings()
+                        bar.holidayLoadedKey = ""
+                        bar.ensureHolidayYear(bar.calendarMonthDate.getFullYear())
+                        bar.refreshWeather(true)
+                    }
+                }
+            }
+
+            Process {
+                id: settingsWriteProc
+                property string commandText: ""
+                command: ["sh", "-c", commandText]
+                running: false
+            }
+
+            Process {
+                id: weatherProc
+                command: ["sh", "-c", bar.buildWeatherCommand()]
+                running: false
+                stdout: StdioCollector {
+                    onStreamFinished: bar.parseWeatherOutput(this.text)
+                }
+            }
+
+            Process {
+                id: holidayProc
+                property int requestYear: 0
+                property string requestCountry: "KR"
+                running: false
+                stdout: StdioCollector {
+                    onStreamFinished: bar.parseHolidayOutput(this.text, holidayProc.requestYear, holidayProc.requestCountry)
+                }
+            }
+
+            function refreshWeather(force) {
+                if (weatherProc.running) {
+                    return
+                }
+                if (!force && (Date.now() - weatherLastFetchMs) < Theme.weatherMinRefreshMs) {
+                    return
+                }
+                weatherCondition = Theme.weatherLoadingText
+                weatherProc.command = ["sh", "-c", buildWeatherCommand()]
+                weatherProc.running = true
+            }
+
+            Timer {
+                id: weatherPollTimer
+                interval: Theme.weatherPollInterval
+                running: true
+                repeat: true
+                triggeredOnStart: true
+                onTriggered: bar.refreshWeather(false)
+            }
+
             function closeControllers() {
                 bluetoothPopup.open = false
                 wifiPopup.open = false
                 cpuPopup.open = false
                 notificationPopup.open = false
+                dateWidgetPopup.open = false
                 closeScreenshotPreview(true)
             }
 
@@ -237,6 +593,7 @@ ShellRoot {
                 wifiPopup.open = false
                 cpuPopup.open = false
                 notificationPopup.open = false
+                dateWidgetPopup.open = false
                 closeScreenshotPreview(true)
                 bluetoothPopup.open = true
             }
@@ -249,6 +606,7 @@ ShellRoot {
                 bluetoothPopup.open = false
                 cpuPopup.open = false
                 notificationPopup.open = false
+                dateWidgetPopup.open = false
                 closeScreenshotPreview(true)
                 wifiPopup.open = true
             }
@@ -261,6 +619,7 @@ ShellRoot {
                 bluetoothPopup.open = false
                 wifiPopup.open = false
                 notificationPopup.open = false
+                dateWidgetPopup.open = false
                 closeScreenshotPreview(true)
                 cpuPopup.open = true
             }
@@ -273,23 +632,40 @@ ShellRoot {
                 bluetoothPopup.open = false
                 wifiPopup.open = false
                 cpuPopup.open = false
+                dateWidgetPopup.open = false
                 closeScreenshotPreview(true)
                 notificationPopup.open = true
             }
 
+            function toggleDateWidget() {
+                if (dateWidgetPopup.open) {
+                    dateWidgetPopup.open = false
+                    return
+                }
+                bluetoothPopup.open = false
+                wifiPopup.open = false
+                cpuPopup.open = false
+                notificationPopup.open = false
+                closeScreenshotPreview(true)
+                dateWidgetPopup.open = true
+            }
+
             function clearTrackedNotifications() {
-                var notifications = []
+                var source = []
                 if (!notificationServer.trackedNotifications) {
                     return
                 }
                 if (notificationServer.trackedNotifications.values !== undefined) {
-                    notifications = notificationServer.trackedNotifications.values
+                    source = notificationServer.trackedNotifications.values
                 } else {
-                    notifications = notificationServer.trackedNotifications
+                    source = notificationServer.trackedNotifications
                 }
-                for (var i = 0; i < notifications.length; i += 1) {
-                    var entry = notifications[i]
-                    markNotificationRead(entry)
+                var notifications = []
+                for (var i = 0; i < source.length; i += 1) {
+                    notifications.push(source[i])
+                }
+                for (var j = notifications.length - 1; j >= 0; j -= 1) {
+                    markNotificationRead(notifications[j])
                 }
             }
 
@@ -312,8 +688,8 @@ ShellRoot {
 
             HyprlandFocusGrab {
                 id: controllerFocusGrab
-                windows: [bar, cpuPopup, bluetoothPopup, wifiPopup, notificationPopup]
-                active: bluetoothPopup.open || wifiPopup.open || cpuPopup.open || notificationPopup.open
+                windows: [bar, cpuPopup, bluetoothPopup, wifiPopup, notificationPopup, dateWidgetPopup]
+                active: bluetoothPopup.open || wifiPopup.open || cpuPopup.open || notificationPopup.open || dateWidgetPopup.open
                 onCleared: bar.closeControllers()
             }
 
@@ -431,6 +807,7 @@ ShellRoot {
 
                 DateTimeIndicator {
                     id: dateTimeIndicator
+                    onClicked: bar.toggleDateWidget()
                 }
 
                 ScreenCaptureIndicator {
@@ -458,7 +835,7 @@ ShellRoot {
             PanelWindow {
                 id: toastPopup
                 implicitWidth: Theme.toastWidth
-                implicitHeight: Math.max(1, toastStack.implicitHeight)
+                implicitHeight: bar.screen ? bar.screen.height : 1080
                 visible: toastModel.count > 0 && bar.hyprMonitor && bar.hyprMonitor.focused
                 color: "transparent"
                 screen: bar.screen
@@ -500,6 +877,7 @@ ShellRoot {
                     id: toastStack
                     anchors.left: parent.left
                     anchors.right: parent.right
+                    height: implicitHeight
                     implicitHeight: {
                         var h = -Theme.toastGap
                         for (var i = 0; i < toastRepeater.count; i += 1) {
@@ -517,6 +895,7 @@ ShellRoot {
                         delegate: Item {
                             id: toastItem
                             width: Theme.toastWidth
+                            height: implicitHeight
                             implicitHeight: toastContent.implicitHeight
                             property int toastId: model.toastId
                             property bool appeared: false
@@ -537,8 +916,8 @@ ShellRoot {
                                 return b
                             }
                             property real slideOffset: closing
-                                ? -(Theme.toastWidth + Theme.toastSlideOffset)
-                                : (appeared ? 0 : (Theme.toastWidth + Theme.toastSlideOffset))
+                                ? -(toastItem.width + Theme.toastSlideOffset)
+                                : (appeared ? 0 : (toastItem.width + Theme.toastSlideOffset))
 
                             anchors.right: parent.right
                             anchors.bottom: parent.bottom
@@ -552,12 +931,14 @@ ShellRoot {
                                 return y
                             }
 
-                            opacity: appeared && !closing ? 1 : 0
+                            opacity: appeared ? 1 : 0
                             scale: 1
                             Component.onCompleted: appeared = true
                             onClosingChanged: {
-                                if (closing)
+                                if (closing) {
+                                    lifeTimer.stop()
                                     removeTimer.restart()
+                                }
                             }
 
                             Behavior on opacity {
@@ -606,10 +987,10 @@ ShellRoot {
                                         id: toastContent
                                         width: parent.width
                                         implicitHeight: toastTextColumn.implicitHeight + Theme.toastPadding * 2
-                                        radius: Theme.blockRadius
-                                        color: Theme.blockBg
+                                        radius: Theme.toastCardRadius
+                                        color: Theme.toastCardBg
                                         border.width: 1
-                                        border.color: Theme.blockBorder
+                                        border.color: Theme.toastCardBorder
 
                                         Column {
                                             id: toastTextColumn
@@ -674,7 +1055,7 @@ ShellRoot {
                                                 Text {
                                                     id: titleText
                                                     text: toastItem.displayTitle
-                                                    color: Theme.accent
+                                                    color: Theme.toastTitleText
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: Theme.toastTitleSize
                                                     font.weight: Theme.fontWeight
@@ -692,7 +1073,7 @@ ShellRoot {
 
                                             Text {
                                                 text: toastItem.displayBody
-                                                color: Theme.textPrimary
+                                                color: Theme.toastBodyText
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: Theme.toastBodySize
                                                 font.weight: Theme.fontWeight
@@ -709,7 +1090,7 @@ ShellRoot {
                                             Rectangle {
                                                 id: toastConfirmButton
                                                 width: parent.width
-                                                height: 28
+                                                height: 32
                                                 radius: 6
                                                 color: Theme.accent
 
@@ -1664,11 +2045,13 @@ ShellRoot {
                 updateBluetoothPopupAnchor()
                 updateWifiPopupAnchor()
                 updateCpuPopupAnchor()
+                updateDateWidgetPopupAnchor()
             }
             onHeightChanged: {
                 updateBluetoothPopupAnchor()
                 updateWifiPopupAnchor()
                 updateCpuPopupAnchor()
+                updateDateWidgetPopupAnchor()
             }
 
             PopupWindow {
@@ -1873,7 +2256,7 @@ ShellRoot {
 
                 Rectangle {
                     anchors.fill: parent
-                    radius: Theme.popupRadius
+                    radius: Theme.toastCardRadius
                     color: Theme.popupBg
                     border.width: 1
                     border.color: Theme.popupBorder
@@ -1901,7 +2284,7 @@ ShellRoot {
 
                                 delegate: Rectangle {
                                     width: parent.width
-                                    radius: Theme.blockRadius
+                                    radius: Theme.toastCardRadius
                                     color: Theme.blockBg
                                     border.width: 1
                                     border.color: Theme.blockBorder
@@ -2072,6 +2455,302 @@ ShellRoot {
                         }
                     }
 
+                }
+            }
+
+            Connections {
+                target: dateTimeIndicator
+                function onWidthChanged() { bar.updateDateWidgetPopupAnchor() }
+                function onHeightChanged() { bar.updateDateWidgetPopupAnchor() }
+            }
+
+            PopupWindow {
+                id: dateWidgetPopup
+                implicitWidth: Theme.dateWidgetPopupWidth
+                implicitHeight: dateWidgetContent.implicitHeight + Theme.dateWidgetPopupPaddingY * 2
+                property bool open: false
+                property real anim: open ? 1 : 0
+                visible: open || anim > 0.01
+                Behavior on anim { NumberAnimation { duration: Theme.controllerAnimMs; easing.type: Easing.OutCubic } }
+                color: "transparent"
+                anchor.window: bar
+
+                Rectangle {
+                    anchors.fill: parent
+                    radius: Theme.dateWidgetPopupRadius
+                    color: Theme.popupBg
+                    border.width: 1
+                    border.color: Theme.popupBorder
+                    opacity: dateWidgetPopup.anim
+                    scale: 0.98 + 0.02 * dateWidgetPopup.anim
+
+                    Row {
+                        id: dateWidgetContent
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.top: parent.top
+                        anchors.leftMargin: Theme.dateWidgetPopupPadding
+                        anchors.rightMargin: Theme.dateWidgetPopupPadding
+                        anchors.topMargin: Theme.dateWidgetPopupPaddingY
+                        spacing: Theme.dateWidgetPopupGap
+
+                        Column {
+                            id: calendarPane
+                            width: Math.floor((parent.width - Theme.dateWidgetPopupGap - 1) / 2)
+                            property int calendarCellWidth: Math.floor((width - Theme.dateWidgetCalendarGap * 6) / 7)
+                            property int calendarContentWidth: calendarCellWidth * 7 + Theme.dateWidgetCalendarGap * 6
+                            spacing: Theme.dateWidgetPopupGap
+
+                            Column {
+                                id: calendarCenterGroup
+                                width: calendarPane.calendarContentWidth
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                spacing: Theme.dateWidgetPopupGap
+
+                                Item {
+                                    id: calendarHeader
+                                    width: parent.width
+                                    height: Theme.dateWidgetNavButtonSize
+
+                                    Rectangle {
+                                        anchors.left: parent.left
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        width: calendarPane.calendarCellWidth
+                                        height: Theme.dateWidgetNavButtonSize
+                                        radius: Theme.blockRadius
+                                        color: Theme.blockBg
+                                        border.width: 1
+                                        border.color: Theme.blockBorder
+
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: "◀"
+                                            color: Theme.textPrimary
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: Theme.controllerFontSizeSmall
+                                            font.weight: Theme.fontWeight
+                                        }
+
+                                        MouseArea {
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: bar.setCalendarMonthOffset(-1)
+                                        }
+                                    }
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        horizontalAlignment: Text.AlignHCenter
+                                        text: Qt.formatDateTime(bar.calendarMonthDate, "yyyy년 MM월")
+                                        color: Theme.accent
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.controllerFontSize
+                                        font.weight: Theme.fontWeight
+                                        verticalAlignment: Text.AlignVCenter
+                                    }
+
+                                    Rectangle {
+                                        anchors.right: parent.right
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        width: calendarPane.calendarCellWidth
+                                        height: Theme.dateWidgetNavButtonSize
+                                        radius: Theme.blockRadius
+                                        color: Theme.blockBg
+                                        border.width: 1
+                                        border.color: Theme.blockBorder
+
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: "▶"
+                                            color: Theme.textPrimary
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: Theme.controllerFontSizeSmall
+                                            font.weight: Theme.fontWeight
+                                        }
+
+                                        MouseArea {
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: bar.setCalendarMonthOffset(1)
+                                        }
+                                    }
+                                }
+
+                                Row {
+                                    width: parent.width
+                                    spacing: Theme.dateWidgetCalendarGap
+
+                                    Repeater {
+                                        model: bar.calendarDayNames
+                                        delegate: Text {
+                                            width: calendarPane.calendarCellWidth
+                                            horizontalAlignment: Text.AlignHCenter
+                                            text: modelData
+                                            color: Theme.accentAlt
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: Theme.fontSizeSmall
+                                            font.weight: Theme.fontWeight
+                                        }
+                                    }
+                                }
+
+                                Grid {
+                                    id: calendarGrid
+                                    width: parent.width
+                                    columns: 7
+                                    rowSpacing: Theme.dateWidgetCalendarGap
+                                    columnSpacing: Theme.dateWidgetCalendarGap
+
+                                    Repeater {
+                                        model: bar.calendarCells
+                                        delegate: Rectangle {
+                                            property bool isCurrentMonth: modelData.isCurrentMonth
+                                            property bool isToday: modelData.isToday
+                                            property bool isHoliday: modelData.isHoliday
+                                            width: calendarPane.calendarCellWidth
+                                            height: Theme.dateWidgetCalendarCellHeight
+                                            radius: Theme.blockRadius
+                                            color: isToday ? Theme.accentAlt : "transparent"
+                                            border.width: isCurrentMonth ? 1 : 0
+                                            border.color: Theme.blockBorder
+                                            opacity: isCurrentMonth ? 1 : 0.45
+
+                                            Text {
+                                                anchors.centerIn: parent
+                                                text: modelData.day
+                                                color: isToday ? Theme.textOnAccent : (isHoliday ? Theme.holidayTextColor : Theme.textPrimary)
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: Theme.fontSizeSmall
+                                                font.weight: Theme.fontWeight
+                                            }
+
+                                            Rectangle {
+                                                anchors.horizontalCenter: parent.horizontalCenter
+                                                anchors.bottom: parent.bottom
+                                                anchors.bottomMargin: 3
+                                                width: Theme.holidayDotSize
+                                                height: Theme.holidayDotSize
+                                                radius: width / 2
+                                                color: Theme.holidayDotColor
+                                                visible: isHoliday && isCurrentMonth && !isToday
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            width: 1
+                            height: Math.max(calendarPane.implicitHeight, weatherPane.implicitHeight)
+                            color: Theme.blockBorder
+                            opacity: 0.7
+                        }
+
+                        Column {
+                            id: weatherPane
+                            width: parent.width - calendarPane.width - Theme.dateWidgetPopupGap - 1
+                            spacing: 8
+                            clip: true
+
+                            Item {
+                                width: 1
+                                height: Theme.weatherIllustrationTopMargin
+                            }
+
+                            Rectangle {
+                                width: parent.width
+                                height: Theme.weatherIllustrationSize
+                                radius: Theme.weatherIllustrationRadius
+                                color: "transparent"
+                                border.width: 0
+
+                                Image {
+                                    anchors.centerIn: parent
+                                    width: Theme.weatherIllustrationImageSize
+                                    height: Theme.weatherIllustrationImageSize
+                                    source: weatherIconUrl
+                                    fillMode: Image.PreserveAspectFit
+                                    smooth: true
+                                    mipmap: true
+                                    asynchronous: true
+                                    scale: Theme.weatherIllustrationScale
+                                }
+                            }
+
+                            Text {
+                                text: weatherCondition + "  " + weatherTemperature + " (" + Theme.weatherFeelsLikeLabel + " " + weatherFeelsLike + ")"
+                                color: Theme.textPrimary
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.controllerFontSizeSmall
+                                font.weight: Theme.fontWeight
+                                width: parent.width
+                                wrapMode: Text.Wrap
+                                maximumLineCount: 2
+                                elide: Text.ElideRight
+                            }
+
+                            Text {
+                                text: Theme.weatherLocationPrefix + ": " + weatherLocationText
+                                color: Theme.focusPipInactive
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeSmall
+                                font.weight: Theme.fontWeight
+                                width: parent.width
+                                wrapMode: Text.Wrap
+                                maximumLineCount: 2
+                                elide: Text.ElideRight
+                            }
+
+                            Text {
+                                text: Theme.weatherHumidityLabel + ": " + weatherHumidity + "\n" + Theme.weatherWindLabel + ": " + weatherWind
+                                color: Theme.textPrimary
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeSmall
+                                font.weight: Theme.fontWeight
+                                width: parent.width
+                                wrapMode: Text.Wrap
+                                maximumLineCount: 2
+                                elide: Text.ElideRight
+                            }
+
+                            Text {
+                                visible: weatherError.length > 0
+                                text: Theme.weatherErrorPrefix + " " + weatherError
+                                color: Theme.cpuText
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeSmall
+                                font.weight: Theme.fontWeight
+                                width: parent.width
+                                wrapMode: Text.Wrap
+                                maximumLineCount: 2
+                                elide: Text.ElideRight
+                            }
+
+                            Text {
+                                text: Theme.weatherUpdatedPrefix + " " + weatherUpdatedAt
+                                color: Theme.focusPipInactive
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeSmall
+                                font.weight: Theme.fontWeight
+                                width: parent.width
+                                wrapMode: Text.Wrap
+                            }
+                        }
+                    }
+                }
+
+                onOpenChanged: {
+                    if (open) {
+                        bar.updateDateWidgetPopupAnchor()
+                        bar.resetCalendarToCurrentMonth()
+                        bar.ensureHolidayYear(bar.calendarMonthDate.getFullYear())
+                        if (bar.weatherLastFetchMs <= 0 || (Date.now() - bar.weatherLastFetchMs) >= Theme.weatherOpenRefreshMs) {
+                            bar.refreshWeather(true)
+                        }
+                    }
                 }
             }
 
