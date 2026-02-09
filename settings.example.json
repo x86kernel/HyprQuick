@@ -1,0 +1,6 @@
+{
+  "weatherApiKey": "",
+  "weatherLocation": "auto:ip",
+  "holidayCountryCode": "KR",
+  "locale": "ko-KR"
+}
