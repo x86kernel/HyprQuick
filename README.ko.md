@@ -7,7 +7,6 @@ QuickShell 기반으로 작성되었고, 좌/중/우 블록형 UI와 팝업 위�
 
 ## 기능
 
-- 좌/중/우 바 레이아웃
 - Workspace / Focused Window / System Tray / Volume / Notification / DateTime 인디케이터
 - 팝업 UI 분리 구조 (`popups/`)
 - 날씨 + 달력 위젯

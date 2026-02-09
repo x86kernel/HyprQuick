@@ -7,7 +7,6 @@ It uses a left/center/right block layout and includes popup widgets (notificatio
 
 ## Features
 
-- Left / center / right bar layout
 - Workspace / Focused Window / System Tray / Volume / Notification / DateTime indicators
 - Modular popup structure (`popups/`)
 - Weather + calendar widget
