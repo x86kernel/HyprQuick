@@ -250,7 +250,7 @@ PanelWindow {
                                     Text {
                                         id: confirmText
                                         anchors.centerIn: parent
-                                        text: "확인"
+                                        text: I18n.t("common.confirm")
                                         color: Theme.textOnAccent
                                         font.family: Theme.fontFamily
                                         font.pixelSize: Theme.controllerFontSizeSmall

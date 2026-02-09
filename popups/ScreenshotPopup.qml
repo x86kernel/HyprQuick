@@ -7,6 +7,12 @@ PopupWindow {
     property var bar
     property var screenshotSaveProc
     property var screenshotCopyProc
+    property var i18nStrings: I18n.activeStrings
+    function tr(key, fallbackText) {
+        var _unused = root.i18nStrings
+        var v = I18n.t(key)
+        return v === key ? fallbackText : v
+    }
 
     implicitWidth: Theme.screenshotPopupWidth
     implicitHeight: Theme.screenshotPopupHeight
@@ -37,7 +43,7 @@ PopupWindow {
 
             Text {
                 id: screenshotTitleLabel
-                text: Theme.screenshotTitle
+                text: root.tr("screenshot.title", "Screenshot Preview")
                 color: Theme.textPrimary
                 font.family: Theme.fontFamily
                 font.pixelSize: Theme.controllerFontSize
@@ -93,7 +99,7 @@ PopupWindow {
 
                     Text {
                         anchors.centerIn: parent
-                        text: Theme.screenshotSaveText
+                        text: root.tr("screenshot.save", "Save")
                         color: Theme.textOnAccent
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.controllerFontSizeSmall
@@ -129,7 +135,7 @@ PopupWindow {
 
                     Text {
                         anchors.centerIn: parent
-                        text: Theme.screenshotCopyText
+                        text: root.tr("screenshot.copy", "Copy")
                         color: Theme.textPrimary
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.controllerFontSizeSmall
@@ -165,7 +171,7 @@ PopupWindow {
 
                     Text {
                         anchors.centerIn: parent
-                        text: Theme.screenshotCloseText
+                        text: root.tr("screenshot.close", "Close")
                         color: Theme.textPrimary
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.controllerFontSizeSmall

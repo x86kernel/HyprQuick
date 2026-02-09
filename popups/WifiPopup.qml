@@ -7,6 +7,13 @@ PopupWindow {
     id: root
     property var bar
     property var wifiIndicator
+    property var i18nStrings: I18n.activeStrings
+    function tr(key, fallbackText) {
+        // Touch active strings so QML re-evaluates bindings when locale data changes.
+        var _unused = root.i18nStrings
+        var v = I18n.t(key)
+        return v === key ? fallbackText : v
+    }
 
     implicitWidth: Theme.wifiPopupWidth
     implicitHeight: Math.max(1, wifiBox.implicitHeight)
@@ -150,7 +157,7 @@ PopupWindow {
                     spacing: 8
 
                     Text {
-                        text: "WiFi"
+                        text: root.tr("wifi.title", "WiFi")
                         color: Theme.textPrimary
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.controllerFontSize
@@ -158,7 +165,9 @@ PopupWindow {
                     }
 
                     Text {
-                        text: wifiIndicator && wifiIndicator.ssid.length > 0 ? wifiIndicator.ssid : "Not connected"
+                        text: wifiIndicator && wifiIndicator.ssid.length > 0
+                            ? wifiIndicator.ssid
+                            : root.tr("wifi.not_connected", "Not connected")
                         color: Theme.wifiText
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.controllerFontSizeSmall
@@ -173,7 +182,9 @@ PopupWindow {
 
                         Text {
                             anchors.centerIn: parent
-                            text: wifiIndicator && wifiIndicator.radioOn ? "Turn WiFi Off" : "Turn WiFi On"
+                            text: wifiIndicator && wifiIndicator.radioOn
+                                ? root.tr("wifi.turn_off", "Turn WiFi Off")
+                                : root.tr("wifi.turn_on", "Turn WiFi On")
                             color: Theme.textOnAccent
                             font.family: Theme.fontFamily
                             font.pixelSize: Theme.controllerFontSizeSmall
@@ -193,7 +204,7 @@ PopupWindow {
                     }
 
                     Text {
-                        text: "Networks"
+                        text: root.tr("wifi.networks", "Networks")
                         color: Theme.textPrimary
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.controllerFontSizeSmall
@@ -279,7 +290,7 @@ PopupWindow {
 
                     Text {
                         visible: !wifiIndicator || wifiIndicator.networks.length === 0
-                        text: "No networks"
+                        text: root.tr("wifi.no_networks", "No networks")
                         color: Theme.textPrimary
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.controllerFontSizeSmall
@@ -293,8 +304,8 @@ PopupWindow {
 
                     Text {
                         text: root.selectedNetwork
-                            ? Theme.wifiConnectQuestion.replace("%1", root.selectedNetwork.ssid)
-                            : Theme.wifiConnectQuestion.replace("%1", "")
+                            ? root.tr("wifi.connect_question", "Connect to {ssid}?").replace("{ssid}", root.selectedNetwork.ssid)
+                            : root.tr("wifi.connect_question", "Connect to {ssid}?").replace("{ssid}", "")
                         color: Theme.textPrimary
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.controllerFontSize
@@ -305,7 +316,7 @@ PopupWindow {
                     Text {
                         visible: root.selectedNetwork && root.selectedNetwork.security
                         text: root.selectedNetwork
-                            ? Theme.wifiSecurityLabel + ": " + root.selectedNetwork.security
+                            ? root.tr("wifi.security_label", "Security") + ": " + root.selectedNetwork.security
                             : ""
                         color: Theme.textPrimary
                         font.family: Theme.fontFamily
@@ -319,7 +330,7 @@ PopupWindow {
                         width: connectPage.width
 
                         Text {
-                            text: Theme.wifiSecurityLabel
+                            text: root.tr("wifi.security_label", "Security")
                             color: Theme.textPrimary
                             font.family: Theme.fontFamily
                             font.pixelSize: Theme.controllerFontSizeSmall
@@ -388,7 +399,7 @@ PopupWindow {
                         width: connectPage.width
 
                         Text {
-                            text: Theme.wifiPasswordLabel
+                            text: root.tr("wifi.password_label", "Password")
                             color: Theme.textPrimary
                             font.family: Theme.fontFamily
                             font.pixelSize: Theme.controllerFontSizeSmall
@@ -428,7 +439,7 @@ PopupWindow {
                                 anchors.right: parent.right
                                 anchors.verticalCenter: parent.verticalCenter
                                 anchors.margins: 10
-                                text: Theme.wifiPasswordPlaceholder
+                                text: root.tr("wifi.password_placeholder", "Enter password")
                                 color: Theme.wifiConnectMutedText
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Theme.controllerFontSizeSmall
@@ -522,7 +533,7 @@ PopupWindow {
 
                 Text {
                     anchors.centerIn: parent
-                    text: Theme.wifiConnectNoText
+                    text: root.tr("wifi.connect_no", "No")
                     color: Theme.textPrimary
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.controllerFontSizeSmall
@@ -546,7 +557,7 @@ PopupWindow {
 
                 Text {
                     anchors.centerIn: parent
-                    text: Theme.wifiConnectYesText
+                    text: root.tr("wifi.connect_yes", "Yes")
                     color: Theme.textOnAccent
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.controllerFontSizeSmall

@@ -1,0 +1,54 @@
+{
+  "common.confirm": "확인",
+  "toast.screenshot_failed": "스크린샷 실패",
+
+  "calendar.day.sun": "일",
+  "calendar.day.mon": "월",
+  "calendar.day.tue": "화",
+  "calendar.day.wed": "수",
+  "calendar.day.thu": "목",
+  "calendar.day.fri": "금",
+  "calendar.day.sat": "토",
+
+  "cpu.title": "CPU",
+  "cpu.usage": "사용량",
+  "cpu.temperature": "온도",
+  "cpu.temp_na": "온도: 없음",
+
+  "bluetooth.title": "블루투스",
+  "bluetooth.powered_on": "전원 켜짐",
+  "bluetooth.powered_off": "전원 꺼짐",
+  "bluetooth.turn_on": "켜기",
+  "bluetooth.turn_off": "끄기",
+  "bluetooth.devices": "기기",
+  "bluetooth.no_devices": "기기 없음",
+
+  "wifi.title": "와이파이",
+  "wifi.not_connected": "연결 안됨",
+  "wifi.turn_on": "와이파이 켜기",
+  "wifi.turn_off": "와이파이 끄기",
+  "wifi.networks": "네트워크",
+  "wifi.no_networks": "네트워크 없음",
+  "wifi.connect_question": "{ssid}에 연결할까요?",
+  "wifi.security_label": "보안",
+  "wifi.password_label": "비밀번호",
+  "wifi.password_placeholder": "비밀번호를 입력하세요",
+  "wifi.connect_yes": "예",
+  "wifi.connect_no": "아니오",
+
+  "screenshot.title": "스크린샷 미리보기",
+  "screenshot.save": "저장",
+  "screenshot.copy": "복사",
+  "screenshot.close": "닫기",
+
+  "weather.feels_like_label": "체감",
+  "weather.location_prefix": "위치",
+  "weather.humidity_label": "습도",
+  "weather.wind_label": "바람",
+  "weather.updated_prefix": "업데이트",
+  "weather.error_prefix": "날씨 오류:",
+  "weather.loading": "날씨 정보를 불러오는 중...",
+  "weather.unavailable": "날씨 정보를 불러올 수 없음",
+
+  "notification.empty": "알림이 없습니다"
+}

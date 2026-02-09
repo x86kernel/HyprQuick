@@ -65,7 +65,7 @@ ShellRoot {
             property int toastCounter: 0
             property var calendarMonthDate: new Date()
             property var calendarCells: []
-            property var calendarDayNames: ["일", "월", "화", "수", "목", "금", "토"]
+            property var calendarDayNames: localizedDayNames()
             property var appSettings: defaultSettings()
             property string settingsFileUrl: Qt.resolvedUrl("settings.json")
             property string settingsFilePath: settingsFileUrl.indexOf("file://") === 0
@@ -92,7 +92,8 @@ ShellRoot {
                 return {
                     weatherApiKey: "",
                     weatherLocation: "auto:ip",
-                    holidayCountryCode: "KR"
+                    holidayCountryCode: "KR",
+                    locale: "ko-KR"
                 }
             }
 
@@ -102,8 +103,34 @@ ShellRoot {
                 return {
                     weatherApiKey: String(next.weatherApiKey !== undefined ? next.weatherApiKey : defaults.weatherApiKey),
                     weatherLocation: String(next.weatherLocation !== undefined ? next.weatherLocation : defaults.weatherLocation),
-                    holidayCountryCode: String(next.holidayCountryCode !== undefined ? next.holidayCountryCode : defaults.holidayCountryCode).toUpperCase()
+                    holidayCountryCode: String(next.holidayCountryCode !== undefined ? next.holidayCountryCode : defaults.holidayCountryCode).toUpperCase(),
+                    locale: I18n.normalizeLocale(next.locale !== undefined ? next.locale : defaults.locale)
                 }
+            }
+
+            function localizedDayNames() {
+                function tr(key, fallback) {
+                    var v = I18n.t(key)
+                    return v === key ? fallback : v
+                }
+                return [
+                    tr("calendar.day.sun", "일"),
+                    tr("calendar.day.mon", "월"),
+                    tr("calendar.day.tue", "화"),
+                    tr("calendar.day.wed", "수"),
+                    tr("calendar.day.thu", "목"),
+                    tr("calendar.day.fri", "금"),
+                    tr("calendar.day.sat", "토")
+                ]
+            }
+
+            function refreshLocalizedState() {
+                calendarDayNames = localizedDayNames()
+            }
+
+            function tr(key, fallbackText) {
+                var v = I18n.t(key)
+                return v === key ? fallbackText : v
             }
 
             function applySettingsText(text) {
@@ -135,7 +162,8 @@ ShellRoot {
                 var next = {
                     weatherApiKey: appSettings.weatherApiKey,
                     weatherLocation: appSettings.weatherLocation,
-                    holidayCountryCode: appSettings.holidayCountryCode
+                    holidayCountryCode: appSettings.holidayCountryCode,
+                    locale: appSettings.locale
                 }
                 next[key] = value
                 appSettings = normalizedSettings(next)
@@ -145,6 +173,11 @@ ShellRoot {
                     ensureHolidayYear(calendarMonthDate.getFullYear())
                 }
                 if (key === "weatherApiKey" || key === "weatherLocation") {
+                    refreshWeather(true)
+                }
+                if (key === "locale") {
+                    I18n.setLocale(appSettings.locale)
+                    refreshLocalizedState()
                     refreshWeather(true)
                 }
             }
@@ -254,6 +287,15 @@ ShellRoot {
                 if (apiKey.length === 0) {
                     return "printf '__QSERR__ missing:weatherapi-key\\n'"
                 }
+                var localeCode = String(appSettings.locale || "en-US").trim().toLowerCase()
+                var weatherLang = "en"
+                if (localeCode.indexOf("ko") === 0) {
+                    weatherLang = "ko"
+                } else if (localeCode.indexOf("ja") === 0) {
+                    weatherLang = "ja"
+                } else if (localeCode.indexOf("zh") === 0) {
+                    weatherLang = "zh"
+                }
                 var location = appSettings.weatherLocation && appSettings.weatherLocation.length > 0
                     ? appSettings.weatherLocation
                     : "auto:ip"
@@ -261,6 +303,7 @@ ShellRoot {
                 var url = "https://api.weatherapi.com/v1/current.json?key="
                     + encodeURIComponent(apiKey)
                     + "&q=" + encodedLocation
+                    + "&lang=" + encodeURIComponent(weatherLang)
                     + "&aqi=no"
                 return "if command -v curl >/dev/null 2>&1; then curl -fsS --max-time 6 '" + url + "'; " +
                     "elif command -v wget >/dev/null 2>&1; then wget -qO- '" + url + "'; " +
@@ -273,18 +316,18 @@ ShellRoot {
                 weatherUpdatedAt = Qt.formatDateTime(new Date(), Theme.weatherUpdatedFormat)
                 weatherError = ""
                 if (text.length === 0) {
-                    weatherCondition = Theme.weatherUnavailableText
+                    weatherCondition = tr("weather.unavailable", Theme.weatherUnavailableText)
                     weatherTemperature = "--"
                     weatherFeelsLike = "--"
                     weatherHumidity = "--"
                     weatherWind = "--"
                     weatherIconUrl = ""
                     weatherLocationText = "--"
-                    weatherError = Theme.weatherUnavailableText
+                    weatherError = tr("weather.unavailable", Theme.weatherUnavailableText)
                     return
                 }
                 if (text.indexOf("__QSERR__") === 0) {
-                    weatherCondition = Theme.weatherUnavailableText
+                    weatherCondition = tr("weather.unavailable", Theme.weatherUnavailableText)
                     weatherTemperature = "--"
                     weatherFeelsLike = "--"
                     weatherHumidity = "--"
@@ -298,31 +341,31 @@ ShellRoot {
                 try {
                     payload = JSON.parse(text)
                 } catch (e) {
-                    weatherCondition = Theme.weatherUnavailableText
+                    weatherCondition = tr("weather.unavailable", Theme.weatherUnavailableText)
                     weatherTemperature = "--"
                     weatherFeelsLike = "--"
                     weatherHumidity = "--"
                     weatherWind = "--"
                     weatherIconUrl = ""
                     weatherLocationText = "--"
-                    weatherError = Theme.weatherUnavailableText
+                    weatherError = tr("weather.unavailable", Theme.weatherUnavailableText)
                     return
                 }
                 if (payload.error) {
-                    weatherCondition = Theme.weatherUnavailableText
+                    weatherCondition = tr("weather.unavailable", Theme.weatherUnavailableText)
                     weatherTemperature = "--"
                     weatherFeelsLike = "--"
                     weatherHumidity = "--"
                     weatherWind = "--"
                     weatherIconUrl = ""
                     weatherLocationText = "--"
-                    weatherError = payload.error.message || Theme.weatherUnavailableText
+                    weatherError = payload.error.message || tr("weather.unavailable", Theme.weatherUnavailableText)
                     return
                 }
                 var location = payload.location || {}
                 var current = payload.current || {}
                 var condition = current.condition || {}
-                weatherCondition = (condition.text || Theme.weatherUnavailableText).trim()
+                weatherCondition = (condition.text || tr("weather.unavailable", Theme.weatherUnavailableText)).trim()
                 weatherTemperature = current.temp_c !== undefined ? (Math.round(Number(current.temp_c)) + "°C") : "--"
                 weatherFeelsLike = current.feelslike_c !== undefined ? (Math.round(Number(current.feelslike_c)) + "°C") : "--"
                 weatherHumidity = current.humidity !== undefined ? (String(current.humidity) + "%") : "--"
@@ -355,6 +398,8 @@ ShellRoot {
                 if (bar.WlrLayershell) {
                     bar.WlrLayershell.keyboardFocus = WlrKeyboardFocus.OnDemand
                 }
+                I18n.setLocale(appSettings.locale)
+                refreshLocalizedState()
                 loadSettings()
             }
 
@@ -523,6 +568,8 @@ ShellRoot {
                     onStreamFinished: {
                         bar.applySettingsText(this.text)
                         bar.saveSettings()
+                        I18n.setLocale(bar.appSettings.locale)
+                        bar.refreshLocalizedState()
                         bar.holidayLoadedKey = ""
                         bar.ensureHolidayYear(bar.calendarMonthDate.getFullYear())
                         bar.refreshWeather(true)
@@ -563,7 +610,7 @@ ShellRoot {
                 if (!force && (Date.now() - weatherLastFetchMs) < Theme.weatherMinRefreshMs) {
                     return
                 }
-                weatherCondition = Theme.weatherLoadingText
+                weatherCondition = tr("weather.loading", Theme.weatherLoadingText)
                 weatherProc.command = ["sh", "-c", buildWeatherCommand()]
                 weatherProc.running = true
             }
@@ -826,7 +873,7 @@ ShellRoot {
                             return
                         }
                         bar.appendToast({
-                            summary: "Screenshot Failed",
+                            summary: I18n.t("toast.screenshot_failed"),
                             body: reason,
                             appName: "QuickShell"
                         })
@@ -937,6 +984,11 @@ ShellRoot {
                 target: dateTimeIndicator
                 function onWidthChanged() { bar.updateDateWidgetPopupAnchor() }
                 function onHeightChanged() { bar.updateDateWidgetPopupAnchor() }
+            }
+
+            Connections {
+                target: I18n
+                function onActiveStringsChanged() { bar.refreshLocalizedState() }
             }
 
             DateWidgetPopup {

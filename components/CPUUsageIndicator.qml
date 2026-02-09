@@ -77,7 +77,7 @@ Item {
             }
         }
         if (temps.length === 0) {
-            return "Temp: n/a"
+            return I18n.t("cpu.temp_na")
         }
         function extractTemp(line) {
             var m = line.match(/[+-]?[0-9.]+\s*°?C/)

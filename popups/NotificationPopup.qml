@@ -182,7 +182,7 @@ PopupWindow {
 
                                 Text {
                                     anchors.centerIn: parent
-                                    text: "확인"
+                                    text: I18n.t("common.confirm")
                                     color: Theme.textOnAccent
                                     font.family: Theme.fontFamily
                                     font.pixelSize: Theme.controllerFontSizeSmall
@@ -224,7 +224,7 @@ PopupWindow {
 
                 Text {
                     Layout.alignment: Qt.AlignHCenter
-                    text: Theme.notificationEmptyText
+                    text: I18n.t("notification.empty")
                     color: Theme.textPrimary
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.controllerFontSizeSmall

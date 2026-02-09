@@ -6,6 +6,13 @@ PopupWindow {
     id: root
     property var bar
     property var bluetoothIndicator
+    property var i18nStrings: I18n.activeStrings
+    function tr(key, fallbackText) {
+        // Touch active strings so QML re-evaluates bindings when locale data changes.
+        var _unused = root.i18nStrings
+        var v = I18n.t(key)
+        return v === key ? fallbackText : v
+    }
 
     implicitWidth: Theme.bluetoothPopupWidth
     implicitHeight: Math.max(1, bluetoothBox.implicitHeight)
@@ -36,7 +43,7 @@ PopupWindow {
             spacing: 8
 
             Text {
-                text: "Bluetooth"
+                text: root.tr("bluetooth.title", "Bluetooth")
                 color: Theme.textPrimary
                 font.family: Theme.fontFamily
                 font.pixelSize: Theme.controllerFontSize
@@ -45,8 +52,8 @@ PopupWindow {
 
             Text {
                 text: bluetoothIndicator
-                    ? (bluetoothIndicator.powered ? "Powered On" : "Powered Off")
-                    : "Powered Off"
+                    ? (bluetoothIndicator.powered ? root.tr("bluetooth.powered_on", "Powered On") : root.tr("bluetooth.powered_off", "Powered Off"))
+                    : root.tr("bluetooth.powered_off", "Powered Off")
                 color: Theme.bluetoothActiveText
                 font.family: Theme.fontFamily
                 font.pixelSize: Theme.controllerFontSizeSmall
@@ -61,7 +68,9 @@ PopupWindow {
 
                 Text {
                     anchors.centerIn: parent
-                    text: bluetoothIndicator && bluetoothIndicator.powered ? "Turn Off" : "Turn On"
+                    text: bluetoothIndicator && bluetoothIndicator.powered
+                        ? root.tr("bluetooth.turn_off", "Turn Off")
+                        : root.tr("bluetooth.turn_on", "Turn On")
                     color: Theme.textOnAccent
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.controllerFontSizeSmall
@@ -81,7 +90,7 @@ PopupWindow {
             }
 
             Text {
-                text: "Devices"
+                text: root.tr("bluetooth.devices", "Devices")
                 color: Theme.textPrimary
                 font.family: Theme.fontFamily
                 font.pixelSize: Theme.controllerFontSizeSmall
@@ -202,7 +211,7 @@ PopupWindow {
 
                 Text {
                     visible: !bluetoothIndicator || bluetoothIndicator.deviceItems.length === 0
-                    text: "No devices"
+                    text: root.tr("bluetooth.no_devices", "No devices")
                     color: Theme.textPrimary
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.controllerFontSizeSmall

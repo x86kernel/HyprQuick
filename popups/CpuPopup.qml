@@ -36,7 +36,7 @@ PopupWindow {
             spacing: 10
 
             Text {
-                text: "CPU"
+                text: I18n.t("cpu.title")
                 color: Theme.textPrimary
                 font.family: Theme.fontFamily
                 font.pixelSize: Theme.controllerFontSize
@@ -44,7 +44,7 @@ PopupWindow {
             }
 
             Text {
-                text: "Usage"
+                text: I18n.t("cpu.usage")
                 color: Theme.textPrimary
                 font.family: Theme.fontFamily
                 font.pixelSize: Theme.controllerFontSizeSmall
@@ -74,7 +74,7 @@ PopupWindow {
             }
 
             Text {
-                text: "Temperature"
+                text: I18n.t("cpu.temperature")
                 color: Theme.textPrimary
                 font.family: Theme.fontFamily
                 font.pixelSize: Theme.controllerFontSizeSmall
@@ -82,7 +82,7 @@ PopupWindow {
             }
 
             Text {
-                text: cpuUsageIndicator ? cpuUsageIndicator.tooltipText : "Temp: n/a"
+                text: cpuUsageIndicator ? cpuUsageIndicator.tooltipText : I18n.t("cpu.temp_na")
                 color: Theme.cpuTooltipText
                 font.family: Theme.fontFamily
                 font.pixelSize: Theme.controllerFontSizeSmall

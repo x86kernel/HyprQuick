@@ -5,6 +5,12 @@ import "../components"
 PopupWindow {
     id: root
     property var bar
+    property var i18nStrings: I18n.activeStrings
+    function tr(key, fallbackText) {
+        var _unused = root.i18nStrings
+        var v = I18n.t(key)
+        return v === key ? fallbackText : v
+    }
 
     implicitWidth: Theme.dateWidgetPopupWidth
     implicitHeight: dateWidgetContent.implicitHeight + Theme.dateWidgetPopupPaddingY * 2
@@ -157,24 +163,28 @@ PopupWindow {
                                 border.color: Theme.blockBorder
                                 opacity: isCurrentMonth ? 1 : 0.45
 
-                                Text {
+                                Column {
                                     anchors.centerIn: parent
-                                    text: modelData.day
-                                    color: isToday ? Theme.textOnAccent : (isHoliday ? Theme.holidayTextColor : Theme.textPrimary)
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: Theme.fontSizeSmall
-                                    font.weight: Theme.fontWeight
-                                }
+                                    spacing: 2
 
-                                Rectangle {
-                                    anchors.horizontalCenter: parent.horizontalCenter
-                                    anchors.bottom: parent.bottom
-                                    anchors.bottomMargin: 3
-                                    width: Theme.holidayDotSize
-                                    height: Theme.holidayDotSize
-                                    radius: width / 2
-                                    color: Theme.holidayDotColor
-                                    visible: isHoliday && isCurrentMonth && !isToday
+                                    Text {
+                                        anchors.horizontalCenter: parent.horizontalCenter
+                                        text: modelData.day
+                                        color: isToday ? Theme.textOnAccent : (isHoliday ? Theme.holidayTextColor : Theme.textPrimary)
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontSizeSmall
+                                        font.weight: Theme.fontWeight
+                                    }
+
+                                    Rectangle {
+                                        anchors.horizontalCenter: parent.horizontalCenter
+                                        anchors.horizontalCenterOffset: 1
+                                        width: Theme.holidayDotSize
+                                        height: Theme.holidayDotSize
+                                        radius: width / 2
+                                        color: Theme.holidayDotColor
+                                        visible: isHoliday && isCurrentMonth && !isToday
+                                    }
                                 }
                             }
                         }
@@ -221,7 +231,7 @@ PopupWindow {
                 }
 
                 Text {
-                    text: bar.weatherCondition + "  " + bar.weatherTemperature + " (" + Theme.weatherFeelsLikeLabel + " " + bar.weatherFeelsLike + ")"
+                    text: bar.weatherCondition + "  " + bar.weatherTemperature + " (" + root.tr("weather.feels_like_label", "Feels") + " " + bar.weatherFeelsLike + ")"
                     color: Theme.textPrimary
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.controllerFontSizeSmall
@@ -233,7 +243,7 @@ PopupWindow {
                 }
 
                 Text {
-                    text: Theme.weatherLocationPrefix + ": " + bar.weatherLocationText
+                    text: root.tr("weather.location_prefix", "Location") + ": " + bar.weatherLocationText
                     color: Theme.focusPipInactive
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.fontSizeSmall
@@ -245,7 +255,8 @@ PopupWindow {
                 }
 
                 Text {
-                    text: Theme.weatherHumidityLabel + ": " + bar.weatherHumidity + "\n" + Theme.weatherWindLabel + ": " + bar.weatherWind
+                    text: root.tr("weather.humidity_label", "Humidity") + ": " + bar.weatherHumidity
+                        + "\n" + root.tr("weather.wind_label", "Wind") + ": " + bar.weatherWind
                     color: Theme.textPrimary
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.fontSizeSmall
@@ -258,7 +269,7 @@ PopupWindow {
 
                 Text {
                     visible: bar.weatherError.length > 0
-                    text: Theme.weatherErrorPrefix + " " + bar.weatherError
+                    text: root.tr("weather.error_prefix", "Weather error:") + " " + bar.weatherError
                     color: Theme.cpuText
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.fontSizeSmall
@@ -270,7 +281,7 @@ PopupWindow {
                 }
 
                 Text {
-                    text: Theme.weatherUpdatedPrefix + " " + bar.weatherUpdatedAt
+                    text: root.tr("weather.updated_prefix", "Updated") + " " + bar.weatherUpdatedAt
                     color: Theme.focusPipInactive
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.fontSizeSmall

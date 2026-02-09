@@ -1,0 +1,54 @@
+{
+  "common.confirm": "Confirm",
+  "toast.screenshot_failed": "Screenshot Failed",
+
+  "calendar.day.sun": "Sun",
+  "calendar.day.mon": "Mon",
+  "calendar.day.tue": "Tue",
+  "calendar.day.wed": "Wed",
+  "calendar.day.thu": "Thu",
+  "calendar.day.fri": "Fri",
+  "calendar.day.sat": "Sat",
+
+  "cpu.title": "CPU",
+  "cpu.usage": "Usage",
+  "cpu.temperature": "Temperature",
+  "cpu.temp_na": "Temp: n/a",
+
+  "bluetooth.title": "Bluetooth",
+  "bluetooth.powered_on": "Powered On",
+  "bluetooth.powered_off": "Powered Off",
+  "bluetooth.turn_on": "Turn On",
+  "bluetooth.turn_off": "Turn Off",
+  "bluetooth.devices": "Devices",
+  "bluetooth.no_devices": "No devices",
+
+  "wifi.title": "WiFi",
+  "wifi.not_connected": "Not connected",
+  "wifi.turn_on": "Turn WiFi On",
+  "wifi.turn_off": "Turn WiFi Off",
+  "wifi.networks": "Networks",
+  "wifi.no_networks": "No networks",
+  "wifi.connect_question": "Connect to {ssid}?",
+  "wifi.security_label": "Security",
+  "wifi.password_label": "Password",
+  "wifi.password_placeholder": "Enter password",
+  "wifi.connect_yes": "Yes",
+  "wifi.connect_no": "No",
+
+  "screenshot.title": "Screenshot Preview",
+  "screenshot.save": "Save",
+  "screenshot.copy": "Copy",
+  "screenshot.close": "Close",
+
+  "weather.feels_like_label": "Feels",
+  "weather.location_prefix": "Location",
+  "weather.humidity_label": "Humidity",
+  "weather.wind_label": "Wind",
+  "weather.updated_prefix": "Updated",
+  "weather.error_prefix": "Weather error:",
+  "weather.loading": "Loading weather...",
+  "weather.unavailable": "Weather unavailable",
+
+  "notification.empty": "No notifications"
+}
