@@ -5,6 +5,10 @@
 A custom top bar setup for Hyprland built with QuickShell, inspired by the HyprPanel style.
 It uses a left/center/right block layout and includes popup widgets (notifications, calendar + weather, WiFi, Bluetooth, CPU, screenshot, toast).
 
+## Preview
+
+![HyprQuick Preview](./docs/screenshots/hyprquick-overview.jpg)
+
 ## Features
 
 - Workspace / Focused Window / System Tray / Volume / Notification / DateTime indicators
@@ -23,6 +27,7 @@ It uses a left/center/right block layout and includes popup widgets (notificatio
 - `popups/`: popup components
 - `i18n/`: locale JSON files
 - `assets/`: UI assets
+- `docs/screenshots/`: README preview images
 - `settings.json`: user settings
 
 ## Requirements
@@ -44,17 +49,37 @@ cp settings.example.json settings.json
 
 ```json
 {
-  "weatherApiKey": "",
-  "weatherLocation": "auto:ip",
-  "holidayCountryCode": "KR",
-  "locale": "ko-KR"
+  "general": {
+    "locale": "ko-KR"
+  },
+  "integrations": {
+    "weather": {
+      "apiKey": "",
+      "location": "auto:ip"
+    },
+    "holidays": {
+      "countryCode": "KR"
+    }
+  },
+  "theme": {
+    "font": {
+      "family": "SF Pro Text",
+      "size": 13,
+      "iconFamily": "SauceCodePro Nerd Font",
+      "iconSize": 15
+    }
+  }
 }
 ```
 
-- `weatherApiKey`: WeatherAPI key
-- `weatherLocation`: e.g. `auto:ip`, `Seoul`, `37.56,126.97`
-- `holidayCountryCode`: holiday country code (e.g. `KR`)
-- `locale`: `ko-KR`, `en-US`
+- `general.locale`: `ko-KR`, `en-US`
+- `integrations.weather.apiKey`: WeatherAPI key
+- `integrations.weather.location`: e.g. `auto:ip`, `Seoul`, `37.56,126.97`
+- `integrations.holidays.countryCode`: holiday country code (e.g. `KR`)
+- `theme.font.family`: main UI font family
+- `theme.font.size`: main UI font size
+- `theme.font.iconFamily`: icon font family
+- `theme.font.iconSize`: icon font size
 - `settings.example.json`: template file for initial setup
 
 ## i18n
@@ -68,7 +93,7 @@ To add another language:
 
 1. Add `i18n/<locale>.json`
 2. Add the locale code to `availableLocales` in `components/I18n.qml`
-3. Change `locale` in `settings.json`
+3. Change `general.locale` in `settings.json`
 
 ## Theming
 

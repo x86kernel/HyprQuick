@@ -90,21 +90,62 @@ ShellRoot {
 
             function defaultSettings() {
                 return {
-                    weatherApiKey: "",
-                    weatherLocation: "auto:ip",
-                    holidayCountryCode: "KR",
-                    locale: "ko-KR"
+                    general: {
+                        locale: "ko-KR"
+                    },
+                    integrations: {
+                        weather: {
+                            apiKey: "",
+                            location: "auto:ip"
+                        },
+                        holidays: {
+                            countryCode: "KR"
+                        }
+                    },
+                    theme: {
+                        font: {
+                            family: Theme.fontFamily,
+                            size: Theme.fontSize,
+                            iconFamily: Theme.iconFontFamily,
+                            iconSize: Theme.iconSize
+                        }
+                    }
                 }
             }
 
             function normalizedSettings(raw) {
                 var defaults = defaultSettings()
                 var next = raw || {}
+                var general = next.general || {}
+                var integrations = next.integrations || {}
+                var weather = integrations.weather || {}
+                var holidays = integrations.holidays || {}
+                var theme = next.theme || {}
+                var font = theme.font || {}
                 return {
-                    weatherApiKey: String(next.weatherApiKey !== undefined ? next.weatherApiKey : defaults.weatherApiKey),
-                    weatherLocation: String(next.weatherLocation !== undefined ? next.weatherLocation : defaults.weatherLocation),
-                    holidayCountryCode: String(next.holidayCountryCode !== undefined ? next.holidayCountryCode : defaults.holidayCountryCode).toUpperCase(),
-                    locale: I18n.normalizeLocale(next.locale !== undefined ? next.locale : defaults.locale)
+                    general: {
+                        // Legacy flat key compatibility: locale
+                        locale: I18n.normalizeLocale(general.locale !== undefined ? general.locale : (next.locale !== undefined ? next.locale : defaults.general.locale))
+                    },
+                    integrations: {
+                        weather: {
+                            // Legacy flat key compatibility: weatherApiKey, weatherLocation
+                            apiKey: String(weather.apiKey !== undefined ? weather.apiKey : (next.weatherApiKey !== undefined ? next.weatherApiKey : defaults.integrations.weather.apiKey)),
+                            location: String(weather.location !== undefined ? weather.location : (next.weatherLocation !== undefined ? next.weatherLocation : defaults.integrations.weather.location))
+                        },
+                        holidays: {
+                            // Legacy flat key compatibility: holidayCountryCode
+                            countryCode: String(holidays.countryCode !== undefined ? holidays.countryCode : (next.holidayCountryCode !== undefined ? next.holidayCountryCode : defaults.integrations.holidays.countryCode)).toUpperCase()
+                        }
+                    },
+                    theme: {
+                        font: {
+                            family: String(font.family !== undefined ? font.family : defaults.theme.font.family),
+                            size: Math.max(8, Number(font.size !== undefined ? font.size : defaults.theme.font.size) || defaults.theme.font.size),
+                            iconFamily: String(font.iconFamily !== undefined ? font.iconFamily : defaults.theme.font.iconFamily),
+                            iconSize: Math.max(8, Number(font.iconSize !== undefined ? font.iconSize : defaults.theme.font.iconSize) || defaults.theme.font.iconSize)
+                        }
+                    }
                 }
             }
 
@@ -126,6 +167,20 @@ ShellRoot {
 
             function refreshLocalizedState() {
                 calendarDayNames = localizedDayNames()
+            }
+
+            function applyThemeSettings() {
+                var font = appSettings.theme.font
+                Theme.fontFamily = font.family
+                Theme.fontSize = Math.round(font.size)
+                Theme.iconFontFamily = font.iconFamily
+                Theme.iconSize = Math.round(font.iconSize)
+            }
+
+            function applyRuntimeSettings() {
+                I18n.setLocale(appSettings.general.locale)
+                applyThemeSettings()
+                refreshLocalizedState()
             }
 
             function tr(key, fallbackText) {
@@ -159,26 +214,50 @@ ShellRoot {
             }
 
             function updateSetting(key, value) {
-                var next = {
-                    weatherApiKey: appSettings.weatherApiKey,
-                    weatherLocation: appSettings.weatherLocation,
-                    holidayCountryCode: appSettings.holidayCountryCode,
-                    locale: appSettings.locale
+                var next = normalizedSettings(appSettings)
+                var mapped = key
+                if (key === "weatherApiKey")
+                    mapped = "integrations.weather.apiKey"
+                else if (key === "weatherLocation")
+                    mapped = "integrations.weather.location"
+                else if (key === "holidayCountryCode")
+                    mapped = "integrations.holidays.countryCode"
+                else if (key === "locale")
+                    mapped = "general.locale"
+                else if (key === "fontFamily")
+                    mapped = "theme.font.family"
+                else if (key === "fontSize")
+                    mapped = "theme.font.size"
+                else if (key === "iconFontFamily")
+                    mapped = "theme.font.iconFamily"
+                else if (key === "iconSize")
+                    mapped = "theme.font.iconSize"
+
+                var parts = mapped.split(".")
+                var cursor = next
+                for (var i = 0; i < parts.length - 1; i += 1) {
+                    if (!cursor[parts[i]] || typeof cursor[parts[i]] !== "object") {
+                        cursor[parts[i]] = {}
+                    }
+                    cursor = cursor[parts[i]]
                 }
-                next[key] = value
+                cursor[parts[parts.length - 1]] = value
                 appSettings = normalizedSettings(next)
                 saveSettings()
-                if (key === "holidayCountryCode") {
+                if (mapped === "integrations.holidays.countryCode") {
                     holidayLoadedKey = ""
                     ensureHolidayYear(calendarMonthDate.getFullYear())
                 }
-                if (key === "weatherApiKey" || key === "weatherLocation") {
+                if (mapped === "integrations.weather.apiKey" || mapped === "integrations.weather.location") {
                     refreshWeather(true)
                 }
-                if (key === "locale") {
-                    I18n.setLocale(appSettings.locale)
-                    refreshLocalizedState()
+                if (mapped === "general.locale") {
+                    applyRuntimeSettings()
                     refreshWeather(true)
+                    return
+                }
+                if (mapped.indexOf("theme.font.") === 0) {
+                    applyThemeSettings()
                 }
             }
 
@@ -243,7 +322,7 @@ ShellRoot {
             }
 
             function ensureHolidayYear(year) {
-                var country = (appSettings.holidayCountryCode || "KR").toUpperCase()
+                var country = (appSettings.integrations.holidays.countryCode || "KR").toUpperCase()
                 var key = String(year) + "-" + country
                 if (holidayLoadedKey === key || holidayProc.running) {
                     return
@@ -283,11 +362,11 @@ ShellRoot {
             }
 
             function buildWeatherCommand() {
-                var apiKey = (appSettings.weatherApiKey || "").trim()
+                var apiKey = (appSettings.integrations.weather.apiKey || "").trim()
                 if (apiKey.length === 0) {
                     return "printf '__QSERR__ missing:weatherapi-key\\n'"
                 }
-                var localeCode = String(appSettings.locale || "en-US").trim().toLowerCase()
+                var localeCode = String(appSettings.general.locale || "en-US").trim().toLowerCase()
                 var weatherLang = "en"
                 if (localeCode.indexOf("ko") === 0) {
                     weatherLang = "ko"
@@ -296,8 +375,8 @@ ShellRoot {
                 } else if (localeCode.indexOf("zh") === 0) {
                     weatherLang = "zh"
                 }
-                var location = appSettings.weatherLocation && appSettings.weatherLocation.length > 0
-                    ? appSettings.weatherLocation
+                var location = appSettings.integrations.weather.location && appSettings.integrations.weather.location.length > 0
+                    ? appSettings.integrations.weather.location
                     : "auto:ip"
                 var encodedLocation = encodeURIComponent(location)
                 var url = "https://api.weatherapi.com/v1/current.json?key="
@@ -398,8 +477,7 @@ ShellRoot {
                 if (bar.WlrLayershell) {
                     bar.WlrLayershell.keyboardFocus = WlrKeyboardFocus.OnDemand
                 }
-                I18n.setLocale(appSettings.locale)
-                refreshLocalizedState()
+                applyRuntimeSettings()
                 loadSettings()
             }
 
@@ -568,8 +646,7 @@ ShellRoot {
                     onStreamFinished: {
                         bar.applySettingsText(this.text)
                         bar.saveSettings()
-                        I18n.setLocale(bar.appSettings.locale)
-                        bar.refreshLocalizedState()
+                        bar.applyRuntimeSettings()
                         bar.holidayLoadedKey = ""
                         bar.ensureHolidayYear(bar.calendarMonthDate.getFullYear())
                         bar.refreshWeather(true)

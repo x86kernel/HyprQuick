@@ -5,6 +5,10 @@
 HyprPanel 스타일에서 영감을 받은, Hyprland용 QuickShell 커스텀 상단 바 설정입니다.  
 QuickShell 기반으로 작성되었고, 좌/중/우 블록형 UI와 팝업 위젯(알림, 달력+날씨, WiFi, Bluetooth, CPU, 스크린샷, 토스트)을 포함합니다.
 
+## Preview
+
+![HyprQuick Preview](./docs/screenshots/hyprquick-overview.jpg)
+
 ## 기능
 
 - Workspace / Focused Window / System Tray / Volume / Notification / DateTime 인디케이터
@@ -23,6 +27,7 @@ QuickShell 기반으로 작성되었고, 좌/중/우 블록형 UI와 팝업 위�
 - `popups/`: 각 팝업 컴포넌트
 - `i18n/`: 로케일 문자열 JSON
 - `assets/`: UI 에셋
+- `docs/screenshots/`: README 미리보기 이미지
 - `settings.json`: 사용자 설정
 
 ## 요구사항
@@ -44,17 +49,37 @@ cp settings.example.json settings.json
 
 ```json
 {
-  "weatherApiKey": "",
-  "weatherLocation": "auto:ip",
-  "holidayCountryCode": "KR",
-  "locale": "ko-KR"
+  "general": {
+    "locale": "ko-KR"
+  },
+  "integrations": {
+    "weather": {
+      "apiKey": "",
+      "location": "auto:ip"
+    },
+    "holidays": {
+      "countryCode": "KR"
+    }
+  },
+  "theme": {
+    "font": {
+      "family": "SF Pro Text",
+      "size": 13,
+      "iconFamily": "SauceCodePro Nerd Font",
+      "iconSize": 15
+    }
+  }
 }
 ```
 
-- `weatherApiKey`: WeatherAPI 키
-- `weatherLocation`: 예) `auto:ip`, `Seoul`, `37.56,126.97`
-- `holidayCountryCode`: 공휴일 국가 코드 (예: `KR`)
-- `locale`: `ko-KR`, `en-US`
+- `general.locale`: `ko-KR`, `en-US`
+- `integrations.weather.apiKey`: WeatherAPI 키
+- `integrations.weather.location`: 예) `auto:ip`, `Seoul`, `37.56,126.97`
+- `integrations.holidays.countryCode`: 공휴일 국가 코드 (예: `KR`)
+- `theme.font.family`: 기본 UI 폰트 패밀리
+- `theme.font.size`: 기본 UI 폰트 크기
+- `theme.font.iconFamily`: 아이콘 폰트 패밀리
+- `theme.font.iconSize`: 아이콘 폰트 크기
 - `settings.example.json`: 초기 설정용 템플릿 파일
 
 ## i18n
@@ -68,7 +93,7 @@ cp settings.example.json settings.json
 
 1. `i18n/<locale>.json` 파일 추가
 2. `components/I18n.qml`의 `availableLocales`에 코드 추가
-3. `settings.json`의 `locale` 값 변경
+3. `settings.json`의 `general.locale` 값 변경
 
 ## 테마
 

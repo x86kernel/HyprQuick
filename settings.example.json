@@ -1,6 +1,22 @@
 {
-  "weatherApiKey": "",
-  "weatherLocation": "auto:ip",
-  "holidayCountryCode": "KR",
-  "locale": "ko-KR"
+  "general": {
+    "locale": "ko-KR"
+  },
+  "integrations": {
+    "weather": {
+      "apiKey": "",
+      "location": "auto:ip"
+    },
+    "holidays": {
+      "countryCode": "KR"
+    }
+  },
+  "theme": {
+    "font": {
+      "family": "SF Pro Text",
+      "size": 13,
+      "iconFamily": "SauceCodePro Nerd Font",
+      "iconSize": 15
+    }
+  }
 }
