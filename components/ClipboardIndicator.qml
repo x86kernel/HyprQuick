@@ -1,10 +1,9 @@
 import QtQuick
-import Quickshell.Io
 import "."
 
 Item {
     id: root
-    property bool hasClipboard: false
+    property bool hasClipboard: SystemState.clipboardHasData
     property bool flashActive: false
     property string lastKey: ""
 
@@ -12,7 +11,7 @@ Item {
     implicitWidth: container.implicitWidth
 
     function applyKey(key) {
-        var trimmed = key.trim()
+        var trimmed = String(key || "").trim()
         hasClipboard = trimmed.length > 0
         if (trimmed.length > 0 && trimmed !== lastKey) {
             lastKey = trimmed
@@ -30,22 +29,14 @@ Item {
         onTriggered: root.flashActive = false
     }
 
-    Process {
-        id: cliphistProc
-        command: ["sh", "-c", "cliphist list | head -n 1"]
-        running: false
-        stdout: StdioCollector {
-            onStreamFinished: root.applyKey(this.text)
+    Connections {
+        target: SystemState
+        function onClipboardKeyChanged() {
+            root.applyKey(SystemState.clipboardKey)
         }
     }
 
-    Timer {
-        interval: Theme.clipboardPollInterval
-        running: true
-        repeat: true
-        triggeredOnStart: true
-        onTriggered: cliphistProc.running = true
-    }
+    Component.onCompleted: root.applyKey(SystemState.clipboardKey)
 
     Rectangle {
         id: container

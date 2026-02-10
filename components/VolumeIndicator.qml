@@ -1,62 +1,21 @@
 import QtQuick
-import Quickshell
-import Quickshell.Io
 import "."
 
 Item {
     id: root
-    property int volumePercent: 0
-    property int volumePercentRaw: 0
+    property int volumePercent: SystemState.volumePercent
+    property int volumePercentRaw: SystemState.volumePercentRaw
     property int intendedVolumePercent: -1
     property int queuedVolumePercent: -1
     property real wheelDeltaRemainder: 0
-    property bool muted: false
-    property bool available: true
+    property bool muted: SystemState.volumeMuted
+    property bool available: SystemState.volumeAvailable
     property bool pendingOsdSync: false
 
     signal osdRequested(int volumePercent, bool muted, bool available)
 
     implicitHeight: container.implicitHeight
     implicitWidth: container.implicitWidth
-
-    function updateFromOutput(text) {
-        var out = (text || "").trim()
-        if (out.length === 0 || out.indexOf("__QSERR__") !== -1) {
-            available = false
-            muted = false
-            volumePercent = 0
-            volumePercentRaw = 0
-            return
-        }
-
-        available = true
-        var lower = out.toLowerCase()
-        muted = lower.indexOf("muted") !== -1 || /\byes\b/.test(lower)
-
-        var matches = out.match(/([0-9]{1,3})%/g)
-        if (matches && matches.length > 0) {
-            var pctText = matches[matches.length - 1].replace("%", "")
-            var pct = Number(pctText)
-            if (!isNaN(pct)) {
-                volumePercentRaw = Math.max(0, Math.round(pct))
-                volumePercent = clampPercent(volumePercentRaw)
-                return
-            }
-        }
-
-        var volMatch = out.match(/volume:\s*([0-9]+(?:\.[0-9]+)?)/i)
-        if (volMatch && volMatch[1]) {
-            var ratio = Number(volMatch[1])
-            if (!isNaN(ratio)) {
-                volumePercentRaw = Math.max(0, Math.round(ratio * 100))
-                volumePercent = clampPercent(volumePercentRaw)
-                return
-            }
-        }
-
-        volumePercent = 0
-        volumePercentRaw = 0
-    }
 
     function clampPercent(value) {
         return Math.max(0, Math.min(100, Math.round(Number(value) || 0)))
@@ -107,47 +66,21 @@ Item {
     }
 
     function applyQueuedVolume() {
-        if (queuedVolumePercent < 0 || setVolumeProc.running) {
+        if (queuedVolumePercent < 0) {
             return
         }
         var target = queuedVolumePercent
         queuedVolumePercent = -1
-
-        setVolumeProc.command = ["sh", "-c",
-            "if command -v wpctl >/dev/null 2>&1; then " +
-            "wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ " + String(target) + "%; " +
-            "elif command -v pactl >/dev/null 2>&1; then " +
-            "pactl set-sink-volume @DEFAULT_SINK@ " + String(target) + "%; fi"]
-        setVolumeProc.running = true
+        SystemState.setVolumePercent(target)
     }
 
-    Process {
-        id: volumeProc
-        command: ["sh", "-c", "if command -v wpctl >/dev/null 2>&1; then wpctl get-volume @DEFAULT_AUDIO_SINK@; elif command -v pactl >/dev/null 2>&1; then pactl get-sink-volume @DEFAULT_SINK@ | head -n1; pactl get-sink-mute @DEFAULT_SINK@; else printf '__QSERR__ missing:wpctl-or-pactl\\n'; fi"]
-        running: true
-        stdout: StdioCollector {
-            onStreamFinished: {
-                root.updateFromOutput(this.text)
-                root.intendedVolumePercent = root.clampPercent(root.volumePercentRaw)
-                if (root.pendingOsdSync) {
-                    root.pendingOsdSync = false
-                    root.requestOsd(root.volumePercent)
-                }
-            }
-        }
-    }
-
-    Process {
-        id: setVolumeProc
-        command: ["sh", "-c", "true"]
-        running: false
-        stdout: StdioCollector {
-            onStreamFinished: {
-                if (root.queuedVolumePercent >= 0) {
-                    root.applyQueuedVolume()
-                } else {
-                    volumeProc.running = true
-                }
+    Connections {
+        target: SystemState
+        function onVolumePercentChanged() {
+            root.intendedVolumePercent = root.clampPercent(SystemState.volumePercentRaw)
+            if (root.pendingOsdSync) {
+                root.pendingOsdSync = false
+                root.requestOsd(SystemState.volumePercent)
             }
         }
     }
@@ -158,13 +91,6 @@ Item {
         running: false
         repeat: false
         onTriggered: root.applyQueuedVolume()
-    }
-
-    Timer {
-        interval: Theme.volumePollInterval
-        running: true
-        repeat: true
-        onTriggered: volumeProc.running = true
     }
 
     Rectangle {

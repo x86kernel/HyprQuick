@@ -42,13 +42,6 @@ PopupWindow {
     color: "transparent"
     anchor.window: bar
 
-    Component.onCompleted: {
-        if (root.WlrLayershell) {
-            root.WlrLayershell.layer = WlrLayer.Overlay
-            root.WlrLayershell.keyboardFocus = WlrKeyboardFocus.None
-        }
-    }
-
     function guessSecurityIndex(securityText) {
         if (!Theme.wifiSecurityOptions || Theme.wifiSecurityOptions.length === 0) {
             return 0
@@ -77,8 +70,15 @@ PopupWindow {
     }
 
     function focusPasswordInput() {
+        acquireKeyboardFocus()
         if (passwordInput) {
             passwordInput.forceActiveFocus()
+        }
+    }
+
+    function acquireKeyboardFocus() {
+        if (bar && bar.WlrLayershell) {
+            bar.WlrLayershell.keyboardFocus = WlrKeyboardFocus.OnDemand
         }
     }
 
@@ -91,6 +91,7 @@ PopupWindow {
             passwordInput.text = ""
         }
         pageIndex = 1
+        acquireKeyboardFocus()
         if (network && network.secure) {
             Qt.callLater(function() { root.focusPasswordInput() })
         }
@@ -325,9 +326,16 @@ PopupWindow {
                     }
 
                     Column {
+                        id: passwordSection
                         visible: root.selectedNetwork && root.selectedNetwork.secure
                         spacing: 6
                         width: connectPage.width
+                        onVisibleChanged: {
+                            if (visible) {
+                                root.acquireKeyboardFocus()
+                                Qt.callLater(function() { root.focusPasswordInput() })
+                            }
+                        }
 
                         Text {
                             text: root.tr("wifi.security_label", "Security")
@@ -425,8 +433,19 @@ PopupWindow {
                                 selectionColor: Theme.accent
                                 selectedTextColor: Theme.textOnAccent
                                 activeFocusOnTab: true
-                                focus: true
+                                selectByMouse: true
                                 clip: true
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                acceptedButtons: Qt.LeftButton
+                                hoverEnabled: false
+                                propagateComposedEvents: true
+                                onPressed: function(mouse) {
+                                    root.focusPasswordInput()
+                                    mouse.accepted = false
+                                }
                             }
 
                             HoverHandler {
@@ -443,7 +462,7 @@ PopupWindow {
                                 color: Theme.wifiConnectMutedText
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Theme.controllerFontSizeSmall
-                                visible: passwordInput.text.length === 0 && !passwordInput.focus
+                                visible: passwordInput.text.length === 0 && !passwordInput.activeFocus
                                 elide: Text.ElideRight
                             }
                         }
@@ -576,21 +595,31 @@ PopupWindow {
 
     onOpenChanged: {
         if (open) {
-            if (root.WlrLayershell) {
-                root.WlrLayershell.keyboardFocus = WlrKeyboardFocus.Exclusive
-            }
+            acquireKeyboardFocus()
             bar.updateWifiPopupAnchor()
             if (wifiIndicator) {
                 wifiIndicator.scanNow()
             }
+        } else {
+            if (bar && bar.WlrLayershell) {
+                bar.WlrLayershell.keyboardFocus = WlrKeyboardFocus.None
+            }
+            closeConnect()
+        }
+    }
+
+    onVisibleChanged: {
+        if (visible && open) {
+            acquireKeyboardFocus()
             if (pageIndex === 1 && selectedNetwork && selectedNetwork.secure) {
                 Qt.callLater(function() { root.focusPasswordInput() })
             }
-        } else {
-            if (root.WlrLayershell) {
-                root.WlrLayershell.keyboardFocus = WlrKeyboardFocus.None
-            }
-            closeConnect()
+        }
+    }
+
+    onPageAnimChanged: {
+        if (open && pageIndex === 1 && selectedNetwork && selectedNetwork.secure && Math.abs(pageAnim - 1) < 0.01) {
+            Qt.callLater(function() { root.focusPasswordInput() })
         }
     }
 

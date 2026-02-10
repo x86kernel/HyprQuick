@@ -1,48 +1,12 @@
 import QtQuick
-import Quickshell.Io
 import "."
 
 Item {
     id: root
-    property real usage: 0
+    property real usage: SystemState.memoryUsage
 
     implicitHeight: container.implicitHeight
     implicitWidth: container.implicitWidth
-
-    function updateFromMeminfo(text) {
-        var lines = text.split(/\r?\n/)
-        var total = 0
-        var available = 0
-        for (var i = 0; i < lines.length; i += 1) {
-            var line = lines[i]
-            if (line.indexOf("MemTotal:") === 0) {
-                total = Number(line.replace(/[^0-9]/g, ""))
-            } else if (line.indexOf("MemAvailable:") === 0) {
-                available = Number(line.replace(/[^0-9]/g, ""))
-            }
-        }
-        if (total > 0) {
-            var used = total - available
-            var pct = used / total * 100
-            usage = Math.max(0, Math.min(100, pct))
-        }
-    }
-
-    Process {
-        id: memProc
-        command: ["sh", "-c", "grep -E 'MemTotal|MemAvailable' /proc/meminfo"]
-        running: true
-        stdout: StdioCollector {
-            onStreamFinished: root.updateFromMeminfo(this.text)
-        }
-    }
-
-    Timer {
-        interval: Theme.memPollInterval
-        running: true
-        repeat: true
-        onTriggered: memProc.running = true
-    }
 
     Rectangle {
         id: container

@@ -117,6 +117,8 @@ Singleton {
     property int wifiPopupPadding: 12
     property int wifiPopupRadius: 12
     property int wifiPopupOffset: 8
+    property int wifiPopupAnchorOffsetX: 0
+    property int wifiPopupAnchorOffsetY: 4
     property color wifiPopupBg: "#181826"
     property color wifiPopupBorder: "transparent"
     property int wifiSignalWidth: 40

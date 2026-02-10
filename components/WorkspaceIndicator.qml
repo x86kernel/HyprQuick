@@ -30,9 +30,10 @@ Item {
     }
 
     function requestWorkspaceRefresh() {
-        if (Hyprland.refreshWorkspaces) {
-            Hyprland.refreshWorkspaces()
-        }
+        // Avoid forcing Hyprland refresh on every workspace change.
+        // Model updates already come through Hyprland.workspaces signals.
+        root.updateUniformWidth()
+        Qt.callLater(function() { root.applyNextStep() })
     }
 
     Component.onCompleted: root.requestWorkspaceRefresh()

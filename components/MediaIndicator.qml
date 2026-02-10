@@ -1,67 +1,13 @@
 import QtQuick
-import Quickshell.Io
 import "."
 
 Item {
     id: root
-    property bool active: false
-    property string displayText: ""
+    property bool active: SystemState.mediaActive
+    property string displayText: SystemState.mediaDisplayText
 
     implicitHeight: container.implicitHeight
     implicitWidth: container.implicitWidth
-
-    function applyPlayerInfo(text) {
-        var lines = text.split(/\r?\n/)
-        var chosen = ""
-        var fallback = ""
-        for (var i = 0; i < lines.length; i += 1) {
-            var line = lines[i].trim()
-            if (line.length === 0)
-                continue
-            if (line.indexOf("Playing|") === 0) {
-                chosen = line
-                break
-            }
-            if (fallback.length === 0 && line.indexOf("Paused|") === 0) {
-                fallback = line
-            }
-        }
-        if (chosen.length === 0) {
-            chosen = fallback
-        }
-        if (chosen.length === 0) {
-            active = false
-            displayText = ""
-            return
-        }
-        var parts = chosen.split("|")
-        var title = parts.length > 2 ? parts[2] : ""
-        var artist = parts.length > 3 ? parts[3] : ""
-        var textOut = title
-        if (artist && title) {
-            textOut = artist + " - " + title
-        } else if (artist) {
-            textOut = artist
-        }
-        active = textOut.length > 0
-        displayText = textOut
-    }
-
-    Process {
-        id: playerProc
-        command: ["sh", "-c", "playerctl -a metadata --format '{{status}}|{{playerName}}|{{title}}|{{artist}}' 2>/dev/null"]
-        running: true
-        stdout: StdioCollector {
-            onStreamFinished: root.applyPlayerInfo(this.text)
-        }
-    }
-
-    Timer {
-        interval: Theme.mediaPollInterval
-        running: true
-        repeat: true
-        onTriggered: playerProc.running = true
-    }
 
     Rectangle {
         id: container

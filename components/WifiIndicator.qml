@@ -1,177 +1,35 @@
 import QtQuick
-import Quickshell.Io
 import "."
 
 Item {
     id: root
-    property string ssid: ""
-    property bool available: true
-    property bool radioOn: true
-    property var networks: []
+    property string ssid: SystemState.wifiSsid
+    property bool available: SystemState.wifiAvailable
+    property bool radioOn: SystemState.wifiRadioOn
+    property var networks: SystemState.wifiNetworks
     signal clicked
 
     implicitHeight: container.implicitHeight
     implicitWidth: container.implicitWidth
 
-    function updateFromOutput(text) {
-        var line = text.trim()
-        if (line.length === 0) {
-            ssid = ""
-            available = false
-            return
-        }
-        available = true
-        ssid = line
-    }
-
-    function updateRadio(text) {
-        var t = text.trim()
-        radioOn = t === "enabled" || t === "yes" || t === "on"
-    }
-
-    function updateNetworks(text) {
-        var lines = text.split(/\r?\n/)
-        var list = []
-        for (var i = 0; i < lines.length; i += 1) {
-            var line = lines[i].trim()
-            if (line.length === 0) {
-                continue
-            }
-            var parts = line.split(":")
-            if (parts.length < 4) {
-                continue
-            }
-            var active = parts[0] === "yes"
-            var ssidValue = parts[1]
-            var securityValue = parts[2]
-            var signal = Number(parts[3])
-            if (ssidValue.length === 0) {
-                continue
-            }
-            var secure = securityValue.length > 0 && securityValue !== "--"
-            list.push({
-                active: active,
-                ssid: ssidValue,
-                security: securityValue,
-                signal: signal,
-                secure: secure
-            })
-        }
-        list.sort(function(a, b) {
-            if (a.active !== b.active) return a.active ? -1 : 1
-            if (a.signal === b.signal) return 0
-            return a.signal > b.signal ? -1 : 1
-        })
-        networks = list
-    }
-
-    Process {
-        id: wifiProc
-        command: ["sh", "-c", "nmcli -t -f ACTIVE,SSID dev wifi | grep '^yes:' | head -n 1 | cut -d: -f2-"]
-        running: true
-        stdout: StdioCollector {
-            onStreamFinished: root.updateFromOutput(this.text)
-        }
-    }
-
-    Process {
-        id: wifiListProc
-        command: ["sh", "-c", "nmcli -t -f ACTIVE,SSID,SECURITY,SIGNAL dev wifi list"]
-        running: false
-        stdout: StdioCollector {
-            onStreamFinished: root.updateNetworks(this.text)
-        }
-    }
-
-    Process {
-        id: wifiRadioProc
-        command: ["sh", "-c", "nmcli -t -f WIFI general status | cut -d: -f2"]
-        running: false
-        stdout: StdioCollector {
-            onStreamFinished: root.updateRadio(this.text)
-        }
-    }
-
-    Process {
-        id: wifiRescanProc
-        running: false
-        stdout: StdioCollector {
-            onStreamFinished: wifiListProc.running = true
-        }
-    }
-
-    Process {
-        id: wifiConnectProc
-        running: false
-        stdout: StdioCollector {
-            onStreamFinished: wifiListProc.running = true
-        }
-    }
-
-    Process {
-        id: wifiDisconnectProc
-        running: false
-        stdout: StdioCollector {
-            onStreamFinished: wifiListProc.running = true
-        }
-    }
-
-    Process {
-        id: wifiToggleProc
-        running: false
-        stdout: StdioCollector {
-            onStreamFinished: wifiListProc.running = true
-        }
-    }
-
     function scanNow() {
-        wifiRescanProc.command = ["sh", "-c", "nmcli dev wifi rescan"]
-        wifiRescanProc.running = true
-    }
-
-    function escapeShell(value) {
-        return "\"" + value.replace(/\\/g, "\\\\").replace(/\"/g, "\\\"") + "\""
+        SystemState.scanWifiNow()
     }
 
     function connectTo(ssidValue, passwordValue, securityValue) {
-        if (!ssidValue || ssidValue.length === 0) {
-            return
-        }
-        var cmd = "nmcli dev wifi connect " + escapeShell(ssidValue)
-        if (passwordValue && passwordValue.length > 0) {
-            cmd += " password " + escapeShell(passwordValue)
-        }
-        if (securityValue && securityValue.length > 0) {
-            cmd += " wifi-sec.key-mgmt " + escapeShell(securityValue)
-        }
-        wifiConnectProc.command = ["sh", "-c", cmd]
-        wifiConnectProc.running = true
+        SystemState.connectWifi(ssidValue, passwordValue, securityValue)
     }
 
     function disconnectNow() {
-        wifiDisconnectProc.command = ["sh", "-c", "nmcli networking off; nmcli networking on"]
-        wifiDisconnectProc.running = true
+        SystemState.disconnectWifiNow()
     }
 
     function disconnectActive() {
-        wifiDisconnectProc.command = ["sh", "-c", "nmcli dev disconnect $(nmcli -t -f DEVICE,TYPE,STATE dev | awk -F: '$2==\"wifi\" && $3==\"connected\" {print $1; exit}')"]
-        wifiDisconnectProc.running = true
+        SystemState.disconnectWifiActive()
     }
 
     function setWifiPower(on) {
-        wifiToggleProc.command = ["sh", "-c", on ? "nmcli radio wifi on" : "nmcli radio wifi off"]
-        wifiToggleProc.running = true
-    }
-
-    Timer {
-        interval: Theme.wifiPollInterval
-        running: true
-        repeat: true
-        onTriggered: {
-            wifiProc.running = true
-            wifiListProc.running = true
-            wifiRadioProc.running = true
-        }
+        SystemState.setWifiPower(on)
     }
 
     Rectangle {

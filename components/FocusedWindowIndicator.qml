@@ -76,18 +76,7 @@ Item {
             return
         }
         root.syncPending = true
-        Qt.callLater(function() {
-            root.syncPending = false
-            if (Hyprland.refreshToplevels) {
-                Hyprland.refreshToplevels()
-            }
-            if (Hyprland.refreshWorkspaces) {
-                Hyprland.refreshWorkspaces()
-            }
-            root.toplevel = root.resolvePreferredToplevel()
-            root.desktopActive = !root.toplevel || !root.toplevel.lastIpcObject
-            root.updateMappedEntry()
-        })
+        syncRefreshDebounce.restart()
     }
 
     Component.onCompleted: root.requestStateRefresh()
@@ -160,10 +149,27 @@ Item {
     Connections {
         target: Hyprland
         function onActiveWorkspaceChanged() {
-            root.requestSyncRefresh()
             root.requestStateRefresh()
         }
         function onActiveToplevelChanged() { root.requestStateRefresh() }
+    }
+
+    Timer {
+        id: syncRefreshDebounce
+        interval: 180
+        repeat: false
+        onTriggered: {
+            root.syncPending = false
+            if (Hyprland.refreshToplevels) {
+                Hyprland.refreshToplevels()
+            }
+            if (Hyprland.refreshWorkspaces) {
+                Hyprland.refreshWorkspaces()
+            }
+            root.toplevel = root.resolvePreferredToplevel()
+            root.desktopActive = !root.toplevel || !root.toplevel.lastIpcObject
+            root.updateMappedEntry()
+        }
     }
 
     Connections {
