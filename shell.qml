@@ -230,6 +230,18 @@ ShellRoot {
                 volumePopup.anchor.rect.height = 1
             }
 
+            function updateClipboardPopupAnchor() {
+                if (!clipboardIndicator || !clipboardPopup) {
+                    return
+                }
+                var anchorItem = bar.contentItem ? bar.contentItem : bar
+                var pos = clipboardIndicator.mapToItem(anchorItem, 0, clipboardIndicator.height)
+                clipboardPopup.anchor.rect.x = pos.x + clipboardIndicator.width - Theme.clipboardPopupWidth
+                clipboardPopup.anchor.rect.y = pos.y + Theme.clipboardPopupOffset
+                clipboardPopup.anchor.rect.width = 1
+                clipboardPopup.anchor.rect.height = 1
+            }
+
             function showVolumePopup(volumePercent, isMuted, isAvailable) {
                 if (!volumePopup) {
                     return
@@ -290,6 +302,7 @@ ShellRoot {
                 bluetoothPopup.open = false
                 wifiPopup.open = false
                 cpuPopup.open = false
+                clipboardPopup.open = false
                 notificationPopup.open = false
                 dateWidgetPopup.open = false
                 screenshotPopup.errorText = ""
@@ -333,6 +346,7 @@ ShellRoot {
                 bluetoothPopup.open = false
                 wifiPopup.open = false
                 cpuPopup.open = false
+                clipboardPopup.open = false
                 notificationPopup.open = false
                 dateWidgetPopup.open = false
                 closeScreenshotPreview(true)
@@ -345,6 +359,7 @@ ShellRoot {
                 }
                 wifiPopup.open = false
                 cpuPopup.open = false
+                clipboardPopup.open = false
                 notificationPopup.open = false
                 dateWidgetPopup.open = false
                 closeScreenshotPreview(true)
@@ -358,6 +373,7 @@ ShellRoot {
                 }
                 bluetoothPopup.open = false
                 cpuPopup.open = false
+                clipboardPopup.open = false
                 notificationPopup.open = false
                 dateWidgetPopup.open = false
                 closeScreenshotPreview(true)
@@ -371,10 +387,25 @@ ShellRoot {
                 }
                 bluetoothPopup.open = false
                 wifiPopup.open = false
+                clipboardPopup.open = false
                 notificationPopup.open = false
                 dateWidgetPopup.open = false
                 closeScreenshotPreview(true)
                 cpuPopup.open = true
+            }
+
+            function toggleClipboardController() {
+                if (clipboardPopup.open) {
+                    clipboardPopup.open = false
+                    return
+                }
+                bluetoothPopup.open = false
+                wifiPopup.open = false
+                cpuPopup.open = false
+                notificationPopup.open = false
+                dateWidgetPopup.open = false
+                closeScreenshotPreview(true)
+                clipboardPopup.open = true
             }
 
             function toggleNotificationCenter() {
@@ -385,6 +416,7 @@ ShellRoot {
                 bluetoothPopup.open = false
                 wifiPopup.open = false
                 cpuPopup.open = false
+                clipboardPopup.open = false
                 dateWidgetPopup.open = false
                 closeScreenshotPreview(true)
                 notificationPopup.open = true
@@ -398,6 +430,7 @@ ShellRoot {
                 bluetoothPopup.open = false
                 wifiPopup.open = false
                 cpuPopup.open = false
+                clipboardPopup.open = false
                 notificationPopup.open = false
                 closeScreenshotPreview(true)
                 dateWidgetPopup.open = true
@@ -441,8 +474,8 @@ ShellRoot {
 
             HyprlandFocusGrab {
                 id: controllerFocusGrab
-                windows: [bar, cpuPopup, bluetoothPopup, wifiPopup, notificationPopup, dateWidgetPopup]
-                active: bluetoothPopup.open || wifiPopup.open || cpuPopup.open || notificationPopup.open || dateWidgetPopup.open
+                windows: [bar, cpuPopup, bluetoothPopup, wifiPopup, clipboardPopup, notificationPopup, dateWidgetPopup]
+                active: bluetoothPopup.open || wifiPopup.open || cpuPopup.open || clipboardPopup.open || notificationPopup.open || dateWidgetPopup.open
                 onCleared: bar.closeControllers()
             }
 
@@ -514,6 +547,11 @@ ShellRoot {
 
                         ClipboardIndicator {
                             id: clipboardIndicator
+                            onClicked: bar.toggleClipboardController()
+                            onRightClicked: {
+                                SystemState.wipeClipboardItems()
+                                clipboardPopup.open = false
+                            }
                         }
 
                         CPUUsageIndicator {
@@ -669,6 +707,12 @@ ShellRoot {
                 bar: bar
             }
 
+            ClipboardPopup {
+                id: clipboardPopup
+                bar: bar
+                clipboardIndicator: clipboardIndicator
+            }
+
             BrightnessPopup {
                 id: brightnessPopup
                 bar: bar
@@ -686,6 +730,7 @@ ShellRoot {
                 updateWifiPopupAnchor()
                 updateCpuPopupAnchor()
                 updateVolumePopupAnchor()
+                updateClipboardPopupAnchor()
                 updateBrightnessPopupAnchor()
                 updateDateWidgetPopupAnchor()
             }
@@ -694,6 +739,7 @@ ShellRoot {
                 updateWifiPopupAnchor()
                 updateCpuPopupAnchor()
                 updateVolumePopupAnchor()
+                updateClipboardPopupAnchor()
                 updateBrightnessPopupAnchor()
                 updateDateWidgetPopupAnchor()
             }
@@ -733,6 +779,12 @@ ShellRoot {
             }
 
             Connections {
+                target: clipboardIndicator
+                function onWidthChanged() { bar.updateClipboardPopupAnchor() }
+                function onHeightChanged() { bar.updateClipboardPopupAnchor() }
+            }
+
+            Connections {
                 target: batteryIndicator
                 function onWidthChanged() { bar.updateBrightnessPopupAnchor() }
                 function onHeightChanged() { bar.updateBrightnessPopupAnchor() }
@@ -756,6 +808,11 @@ ShellRoot {
             Connections {
                 target: volumePopup
                 function onOpenChanged() { bar.enforcePopupNoKeyboardFocus(volumePopup) }
+            }
+
+            Connections {
+                target: clipboardPopup
+                function onOpenChanged() { bar.enforcePopupNoKeyboardFocus(clipboardPopup) }
             }
 
             Connections {

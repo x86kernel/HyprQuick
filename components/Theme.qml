@@ -192,6 +192,14 @@ Singleton {
     property color clipboardActiveText: "#0b0b16"
     property color clipboardInactiveText: "#585b70"
     property int clipboardPollInterval: 400
+    property int clipboardPopupWidth: 420
+    property int clipboardPopupPadding: 12
+    property int clipboardPopupRadius: 12
+    property int clipboardPopupOffset: 8
+    property int clipboardPopupListHeight: 280
+    property int clipboardPopupItemHeight: 36
+    property color clipboardPopupBg: "#181826"
+    property color clipboardPopupBorder: "transparent"
 
     property color blockBg: "#242438"
     property color blockBorder: "transparent"

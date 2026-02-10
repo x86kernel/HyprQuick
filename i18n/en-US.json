@@ -52,6 +52,7 @@
 
   "brightness.title": "Brightness",
   "volume.muted": "Muted",
+  "clipboard.empty": "No clipboard items",
 
   "notification.empty": "No notifications"
 }

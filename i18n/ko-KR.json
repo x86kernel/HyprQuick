@@ -52,6 +52,7 @@
 
   "brightness.title": "밝기",
   "volume.muted": "음소거",
+  "clipboard.empty": "클립보드 항목 없음",
 
   "notification.empty": "알림이 없습니다"
 }

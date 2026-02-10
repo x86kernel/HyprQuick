@@ -6,6 +6,10 @@ Item {
     property bool hasClipboard: SystemState.clipboardHasData
     property bool flashActive: false
     property string lastKey: ""
+    property var items: SystemState.clipboardItems
+
+    signal clicked()
+    signal rightClicked()
 
     implicitHeight: container.implicitHeight
     implicitWidth: container.implicitWidth
@@ -20,6 +24,14 @@ Item {
         } else if (!hasClipboard) {
             flashActive = false
         }
+    }
+
+    function refreshItems() {
+        SystemState.refreshClipboardItems()
+    }
+
+    function copyItem(itemId) {
+        SystemState.copyClipboardItem(itemId)
     }
 
     Timer {
@@ -62,6 +74,20 @@ Item {
             font.family: Theme.iconFontFamily
             font.pixelSize: Theme.iconSize
             font.weight: Theme.fontWeight
+        }
+
+        MouseArea {
+            anchors.fill: parent
+            acceptedButtons: Qt.LeftButton | Qt.RightButton
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: function(mouse) {
+                if (mouse.button === Qt.RightButton) {
+                    root.rightClicked()
+                    return
+                }
+                root.clicked()
+            }
         }
     }
 }

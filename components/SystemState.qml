@@ -35,6 +35,9 @@ Singleton {
     property string mediaDisplayText: ""
     property string clipboardKey: ""
     property bool clipboardHasData: false
+    property var clipboardItems: []
+    property bool clipboardWatchActive: false
+    property bool clipboardWatchSupported: true
     property bool vpnConnected: false
     property string vpnActiveName: ""
 
@@ -57,27 +60,50 @@ Singleton {
         return "\"" + String(value || "").replace(/\\/g, "\\\\").replace(/\"/g, "\\\"") + "\""
     }
 
+    // Core snapshots
+    property bool coreFastBusy: false
+    property bool coreSlowBusy: false
+
+    function refreshCoreFast() {
+        if (coreFastBusy) {
+            return
+        }
+        coreFastBusy = true
+        coreFastSnapshotProc.running = true
+    }
+
+    function refreshCoreSlow() {
+        if (coreSlowBusy) {
+            return
+        }
+        coreSlowBusy = true
+        coreSlowSnapshotProc.running = true
+    }
+
     // Volume
     function parseVolume(text) {
         var out = (text || "").trim()
         if (out.length === 0 || out.indexOf("__QSERR__") !== -1) {
-            volumeAvailable = false
-            volumeMuted = false
-            volumePercent = 0
-            volumePercentRaw = 0
+            if (volumeAvailable !== false) volumeAvailable = false
+            if (volumeMuted !== false) volumeMuted = false
+            if (volumePercent !== 0) volumePercent = 0
+            if (volumePercentRaw !== 0) volumePercentRaw = 0
             return
         }
 
-        volumeAvailable = true
+        if (volumeAvailable !== true) volumeAvailable = true
         var lower = out.toLowerCase()
-        volumeMuted = lower.indexOf("muted") !== -1 || /\byes\b/.test(lower)
+        var nextMuted = lower.indexOf("muted") !== -1 || /\byes\b/.test(lower)
+        if (volumeMuted !== nextMuted) volumeMuted = nextMuted
 
         var matches = out.match(/([0-9]{1,3})%/g)
         if (matches && matches.length > 0) {
             var pct = Number(matches[matches.length - 1].replace("%", ""))
             if (!isNaN(pct)) {
-                volumePercentRaw = Math.max(0, Math.round(pct))
-                volumePercent = clampPercent(volumePercentRaw)
+                var nextRaw = Math.max(0, Math.round(pct))
+                var nextPct = clampPercent(nextRaw)
+                if (volumePercentRaw !== nextRaw) volumePercentRaw = nextRaw
+                if (volumePercent !== nextPct) volumePercent = nextPct
                 return
             }
         }
@@ -86,24 +112,22 @@ Singleton {
         if (volMatch && volMatch[1]) {
             var ratio = Number(volMatch[1])
             if (!isNaN(ratio)) {
-                volumePercentRaw = Math.max(0, Math.round(ratio * 100))
-                volumePercent = clampPercent(volumePercentRaw)
+                var nextRatioRaw = Math.max(0, Math.round(ratio * 100))
+                var nextRatioPct = clampPercent(nextRatioRaw)
+                if (volumePercentRaw !== nextRatioRaw) volumePercentRaw = nextRatioRaw
+                if (volumePercent !== nextRatioPct) volumePercent = nextRatioPct
                 return
             }
         }
 
-        volumePercent = 0
-        volumePercentRaw = 0
-    }
-
-    function refreshVolume() {
-        volumeReadProc.running = true
+        if (volumePercent !== 0) volumePercent = 0
+        if (volumePercentRaw !== 0) volumePercentRaw = 0
     }
 
     function setVolumePercent(target) {
         var pct = clampPercent(target)
-        volumePercentRaw = pct
-        volumePercent = pct
+        if (volumePercentRaw !== pct) volumePercentRaw = pct
+        if (volumePercent !== pct) volumePercent = pct
         volumeSetProc.command = ["sh", "-c",
             "if command -v wpctl >/dev/null 2>&1; then " +
             "wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ " + String(pct) + "%; " +
@@ -113,24 +137,10 @@ Singleton {
     }
 
     Process {
-        id: volumeReadProc
-        command: ["sh", "-c", "if command -v wpctl >/dev/null 2>&1; then wpctl get-volume @DEFAULT_AUDIO_SINK@; elif command -v pactl >/dev/null 2>&1; then pactl get-sink-volume @DEFAULT_SINK@ | head -n1; pactl get-sink-mute @DEFAULT_SINK@; else printf '__QSERR__ missing:wpctl-or-pactl\\n'; fi"]
-        running: true
-        stdout: StdioCollector { onStreamFinished: state.parseVolume(this.text) }
-    }
-
-    Process {
         id: volumeSetProc
         command: ["sh", "-c", "true"]
         running: false
-        stdout: StdioCollector { onStreamFinished: state.refreshVolume() }
-    }
-
-    Timer {
-        interval: Theme.volumePollInterval
-        running: true
-        repeat: true
-        onTriggered: state.refreshVolume()
+        stdout: StdioCollector { onStreamFinished: state.refreshCoreFast() }
     }
 
     // Battery
@@ -138,7 +148,8 @@ Singleton {
         var lines = (text || "").split(/\r?\n/)
         var pct = 0
         var st = "unknown"
-        batteryAvailable = true
+        var nextAvailable = true
+        var nextAcOnline = acOnline
         for (var i = 0; i < lines.length; i += 1) {
             var line = lines[i].trim()
             if (line.indexOf("percentage:") === 0) {
@@ -146,62 +157,43 @@ Singleton {
             } else if (line.indexOf("state:") === 0) {
                 st = line.split(":")[1].trim()
             } else if (line.indexOf("online:") === 0) {
-                acOnline = line.split(":")[1].trim() === "yes"
+                nextAcOnline = line.split(":")[1].trim() === "yes"
             } else if (line === "NO_BATTERY") {
-                batteryAvailable = false
+                nextAvailable = false
             }
         }
-        if (!batteryAvailable) {
-            batteryPercent = 0
-            batteryState = "unknown"
+        if (acOnline !== nextAcOnline) acOnline = nextAcOnline
+        if (batteryAvailable !== nextAvailable) batteryAvailable = nextAvailable
+        if (!nextAvailable) {
+            if (batteryPercent !== 0) batteryPercent = 0
+            if (batteryState !== "unknown") batteryState = "unknown"
             return
         }
-        batteryPercent = pct
-        batteryState = st
-    }
-
-    function refreshBattery() {
-        batteryReadProc.running = true
-    }
-
-    Process {
-        id: batteryReadProc
-        command: ["sh", "-c", "b=$(upower -e | grep -m1 BAT); a=$(upower -e | grep -m1 line_power); if [ -z \"$b\" ]; then echo NO_BATTERY; else upower -i \"$b\" | grep -E 'state:|percentage:'; if [ -n \"$a\" ]; then upower -i \"$a\" | grep -E 'online:'; fi; fi"]
-        running: true
-        stdout: StdioCollector { onStreamFinished: state.parseBattery(this.text) }
-    }
-
-    Timer {
-        interval: Theme.batteryPollInterval
-        running: true
-        repeat: true
-        onTriggered: state.refreshBattery()
+        if (batteryPercent !== pct) batteryPercent = pct
+        if (batteryState !== st) batteryState = st
     }
 
     // Brightness
     function parseBrightness(text) {
         var out = (text || "").trim()
         if (out.length === 0 || out.indexOf("__QSERR__") !== -1) {
-            brightnessAvailable = false
-            brightnessPercent = 0
+            if (brightnessAvailable !== false) brightnessAvailable = false
+            if (brightnessPercent !== 0) brightnessPercent = 0
             return
         }
-        brightnessAvailable = true
+        if (brightnessAvailable !== true) brightnessAvailable = true
         var match = out.match(/([0-9]{1,3})(?:\.[0-9]+)?%?/) 
         if (match && match[1]) {
-            brightnessPercent = clampPercent(match[1])
+            var nextPct = clampPercent(match[1])
+            if (brightnessPercent !== nextPct) brightnessPercent = nextPct
             return
         }
-        brightnessPercent = 0
-    }
-
-    function refreshBrightness() {
-        brightnessReadProc.running = true
+        if (brightnessPercent !== 0) brightnessPercent = 0
     }
 
     function setBrightnessPercent(target) {
         var pct = clampPercent(target)
-        brightnessPercent = pct
+        if (brightnessPercent !== pct) brightnessPercent = pct
         brightnessSetProc.command = ["sh", "-c",
             "if command -v brightnessctl >/dev/null 2>&1; then " +
             "brightnessctl set " + String(pct) + "%; " +
@@ -220,24 +212,10 @@ Singleton {
     }
 
     Process {
-        id: brightnessReadProc
-        command: ["sh", "-c", "if command -v brightnessctl >/dev/null 2>&1; then brightnessctl -m | awk -F, 'NR==1{print $4}'; elif command -v light >/dev/null 2>&1; then light -G | awk '{printf \"%d%%\\n\", $1}'; else printf '__QSERR__ missing:brightnessctl-or-light\\n'; fi"]
-        running: true
-        stdout: StdioCollector { onStreamFinished: state.parseBrightness(this.text) }
-    }
-
-    Process {
         id: brightnessSetProc
         command: ["sh", "-c", "true"]
         running: false
-        stdout: StdioCollector { onStreamFinished: state.refreshBrightness() }
-    }
-
-    Timer {
-        interval: Theme.brightnessPollInterval
-        running: true
-        repeat: true
-        onTriggered: state.refreshBrightness()
+        stdout: StdioCollector { onStreamFinished: state.refreshCoreFast() }
     }
 
     // CPU usage and temp
@@ -298,28 +276,13 @@ Singleton {
         cpuTemperatureText = extractTemp(temps[0])
     }
 
-    function refreshCpu() { cpuReadProc.running = true }
     function refreshCpuTemp() { cpuTempProc.running = true }
-
-    Process {
-        id: cpuReadProc
-        command: ["sh", "-c", "grep '^cpu ' /proc/stat"]
-        running: true
-        stdout: StdioCollector { onStreamFinished: state.parseCpuStat(this.text) }
-    }
 
     Process {
         id: cpuTempProc
         command: ["sh", "-c", "sensors"]
         running: false
         stdout: StdioCollector { onStreamFinished: state.parseSensors(this.text) }
-    }
-
-    Timer {
-        interval: Theme.cpuPollInterval
-        running: true
-        repeat: true
-        onTriggered: state.refreshCpu()
     }
 
     Timer {
@@ -344,24 +307,9 @@ Singleton {
             }
         }
         if (total > 0) {
-            memoryUsage = Math.max(0, Math.min(100, (total - availableMem) / total * 100))
+            var nextUsage = Math.max(0, Math.min(100, (total - availableMem) / total * 100))
+            if (memoryUsage !== nextUsage) memoryUsage = nextUsage
         }
-    }
-
-    function refreshMemory() { memReadProc.running = true }
-
-    Process {
-        id: memReadProc
-        command: ["sh", "-c", "grep -E 'MemTotal|MemAvailable' /proc/meminfo"]
-        running: true
-        stdout: StdioCollector { onStreamFinished: state.parseMeminfo(this.text) }
-    }
-
-    Timer {
-        interval: Theme.memPollInterval
-        running: true
-        repeat: true
-        onTriggered: state.refreshMemory()
     }
 
     // Media
@@ -417,11 +365,66 @@ Singleton {
     // Clipboard
     function parseClipboard(text) {
         var key = String(text || "").trim()
-        clipboardKey = key
-        clipboardHasData = key.length > 0
+        var hasData = key.length > 0
+        if (clipboardKey !== key) clipboardKey = key
+        if (clipboardHasData !== hasData) clipboardHasData = hasData
     }
 
     function refreshClipboard() { clipboardReadProc.running = true }
+    function refreshClipboardItems() { clipboardListProc.running = true }
+
+    function startClipboardWatcher() {
+        if (!clipboardWatchSupported) {
+            return
+        }
+        if (clipboardWatchProc.running) {
+            return
+        }
+        clipboardWatchProc.running = true
+    }
+
+    function parseClipboardItems(text) {
+        var lines = String(text || "").split(/\r?\n/)
+        var items = []
+        for (var i = 0; i < lines.length; i += 1) {
+            var line = lines[i]
+            if (!line || line.length === 0) {
+                continue
+            }
+            var tab = line.indexOf("\t")
+            if (tab <= 0) {
+                continue
+            }
+            var id = line.slice(0, tab).trim()
+            var label = line.slice(tab + 1).trim()
+            if (id.length === 0) {
+                continue
+            }
+            items.push({
+                itemId: id,
+                label: label.length > 0 ? label : "(empty)"
+            })
+            if (items.length >= 24) {
+                break
+            }
+        }
+        clipboardItems = items
+    }
+
+    function copyClipboardItem(itemId) {
+        var id = String(itemId || "").trim()
+        if (id.length === 0) {
+            return
+        }
+        clipboardCopyProc.command = ["sh", "-c",
+            "cliphist decode " + shellEscape(id) + " | wl-copy"]
+        clipboardCopyProc.running = true
+    }
+
+    function wipeClipboardItems() {
+        clipboardWipeProc.command = ["sh", "-c", "cliphist wipe"]
+        clipboardWipeProc.running = true
+    }
 
     Process {
         id: clipboardReadProc
@@ -430,9 +433,84 @@ Singleton {
         stdout: StdioCollector { onStreamFinished: state.parseClipboard(this.text) }
     }
 
+    Process {
+        id: clipboardListProc
+        command: ["sh", "-c", "cliphist list | head -n 24"]
+        running: false
+        stdout: StdioCollector { onStreamFinished: state.parseClipboardItems(this.text) }
+    }
+
+    Process {
+        id: clipboardCopyProc
+        command: ["sh", "-c", "true"]
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished: {
+                state.refreshClipboard()
+                state.refreshClipboardItems()
+            }
+        }
+    }
+
+    Process {
+        id: clipboardWipeProc
+        command: ["sh", "-c", "true"]
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished: {
+                state.clipboardItems = []
+                state.clipboardKey = ""
+                state.clipboardHasData = false
+                state.refreshClipboard()
+                state.refreshClipboardItems()
+            }
+        }
+    }
+
+    Process {
+        id: clipboardWatchProc
+        command: ["sh", "-c",
+            "if ! command -v wl-paste >/dev/null 2>&1; then exit 127; fi; " +
+            "wl-paste --watch sh -c 'if command -v cliphist >/dev/null 2>&1; then cliphist store >/dev/null 2>&1; fi; " +
+            "printf \"__QS_CLIP_CHANGED__\\n\"'"]
+        running: false
+        stdout: SplitParser {
+            splitMarker: "\n"
+            onRead: function(data) {
+                if (String(data).indexOf("__QS_CLIP_CHANGED__") !== -1) {
+                    state.refreshClipboard()
+                    state.refreshClipboardItems()
+                }
+            }
+        }
+        onStarted: {
+            state.clipboardWatchActive = true
+            state.refreshClipboard()
+            state.refreshClipboardItems()
+        }
+        onExited: function(exitCode) {
+            state.clipboardWatchActive = false
+            if (exitCode === 127) {
+                state.clipboardWatchSupported = false
+                return
+            }
+            if (state.clipboardWatchSupported) {
+                clipboardWatchRestartTimer.restart()
+            }
+        }
+    }
+
     Timer {
-        interval: Theme.clipboardPollInterval
-        running: true
+        id: clipboardWatchRestartTimer
+        interval: 2000
+        running: false
+        repeat: false
+        onTriggered: state.startClipboardWatcher()
+    }
+
+    Timer {
+        interval: Math.max(2000, Theme.clipboardPollInterval * 3)
+        running: !state.clipboardWatchActive
         repeat: true
         triggeredOnStart: true
         onTriggered: state.refreshClipboard()
@@ -441,25 +519,108 @@ Singleton {
     // VPN
     function parseVpn(text) {
         var line = String(text || "").trim()
-        vpnConnected = line.length > 0
-        vpnActiveName = line
+        var nextConnected = line.length > 0
+        if (vpnConnected !== nextConnected) vpnConnected = nextConnected
+        if (vpnActiveName !== line) vpnActiveName = line
     }
 
-    function refreshVpn() { vpnReadProc.running = true }
+    function parseCoreFastSnapshot(text) {
+        var lines = String(text || "").split(/\r?\n/)
+        var volumeLines = []
+        var brightnessLines = []
+        var cpuLine = ""
+        var memLines = []
+
+        for (var i = 0; i < lines.length; i += 1) {
+            var line = lines[i] || ""
+            if (line.indexOf("__QS_VOL__ ") === 0) {
+                volumeLines.push(line.slice(11))
+            } else if (line.indexOf("__QS_BRI__ ") === 0) {
+                brightnessLines.push(line.slice(11))
+            } else if (line.indexOf("__QS_CPU__ ") === 0) {
+                cpuLine = line.slice(11)
+            } else if (line.indexOf("__QS_MEM__ ") === 0) {
+                memLines.push(line.slice(11))
+            }
+        }
+
+        parseVolume(volumeLines.join("\n"))
+        parseBrightness(brightnessLines.join("\n"))
+        parseCpuStat(cpuLine)
+        parseMeminfo(memLines.join("\n"))
+        coreFastBusy = false
+    }
+
+    function parseCoreSlowSnapshot(text) {
+        var lines = String(text || "").split(/\r?\n/)
+        var batteryLines = []
+        var vpnLines = []
+
+        for (var i = 0; i < lines.length; i += 1) {
+            var line = lines[i] || ""
+            if (line.indexOf("__QS_BAT__ ") === 0) {
+                batteryLines.push(line.slice(11))
+            } else if (line.indexOf("__QS_VPN__ ") === 0) {
+                vpnLines.push(line.slice(11))
+            }
+        }
+
+        parseBattery(batteryLines.join("\n"))
+        parseVpn(vpnLines.join("\n"))
+        coreSlowBusy = false
+    }
 
     Process {
-        id: vpnReadProc
-        command: ["sh", "-c", "if ! command -v nmcli >/dev/null 2>&1; then exit 0; fi; nmcli -t -f TYPE,NAME connection show --active | awk -F: '$1==\"vpn\" || $1==\"wireguard\" {print $2; exit}'"]
-        running: true
-        stdout: StdioCollector { onStreamFinished: state.parseVpn(this.text) }
+        id: coreFastSnapshotProc
+        command: ["sh", "-c",
+            "(if command -v wpctl >/dev/null 2>&1; then wpctl get-volume @DEFAULT_AUDIO_SINK@; " +
+            "elif command -v pactl >/dev/null 2>&1; then pactl get-sink-volume @DEFAULT_SINK@ | head -n1; pactl get-sink-mute @DEFAULT_SINK@; " +
+            "else printf '__QSERR__ missing:wpctl-or-pactl\\n'; fi) | sed 's/^/__QS_VOL__ /'; " +
+            "(if command -v brightnessctl >/dev/null 2>&1; then brightnessctl -m | awk -F, 'NR==1{print $4}'; " +
+            "elif command -v light >/dev/null 2>&1; then light -G | awk '{printf \"%d%%\\n\", $1}'; " +
+            "else printf '__QSERR__ missing:brightnessctl-or-light\\n'; fi) | sed 's/^/__QS_BRI__ /'; " +
+            "grep '^cpu ' /proc/stat 2>/dev/null | head -n1 | sed 's/^/__QS_CPU__ /'; " +
+            "grep -E 'MemTotal|MemAvailable' /proc/meminfo 2>/dev/null | sed 's/^/__QS_MEM__ /'"]
+        running: false
+        stdout: StdioCollector { onStreamFinished: state.parseCoreFastSnapshot(this.text) }
+        onRunningChanged: {
+            if (!running) {
+                state.coreFastBusy = false
+            }
+        }
+    }
+
+    Process {
+        id: coreSlowSnapshotProc
+        command: ["sh", "-c",
+            "(b=$(upower -e | grep -m1 BAT); a=$(upower -e | grep -m1 line_power); " +
+            "if [ -z \"$b\" ]; then echo NO_BATTERY; else upower -i \"$b\" | grep -E 'state:|percentage:'; " +
+            "if [ -n \"$a\" ]; then upower -i \"$a\" | grep -E 'online:'; fi; fi) | sed 's/^/__QS_BAT__ /'; " +
+            "(if command -v nmcli >/dev/null 2>&1; then " +
+            "nmcli -t -f TYPE,NAME connection show --active | awk -F: '$1==\"vpn\" || $1==\"wireguard\" {print $2; exit}'; fi) | sed 's/^/__QS_VPN__ /'"]
+        running: false
+        stdout: StdioCollector { onStreamFinished: state.parseCoreSlowSnapshot(this.text) }
+        onRunningChanged: {
+            if (!running) {
+                state.coreSlowBusy = false
+            }
+        }
     }
 
     Timer {
-        interval: Theme.vpnPollInterval
+        interval: Math.max(250, Math.min(Theme.volumePollInterval, Theme.brightnessPollInterval, Theme.cpuPollInterval, Theme.memPollInterval))
         running: true
         repeat: true
         triggeredOnStart: true
-        onTriggered: state.refreshVpn()
+        onTriggered: state.refreshCoreFast()
+    }
+
+    Timer {
+        interval: Math.max(500, Math.min(Theme.batteryPollInterval, Theme.vpnPollInterval))
+        running: true
+        repeat: true
+        triggeredOnStart: true
+        onTriggered: state.refreshCoreSlow()
     }
 
     // WiFi
@@ -1155,6 +1316,7 @@ Singleton {
         applyRuntimeSettings()
         loadSettings()
         resetCalendarToCurrentMonth()
+        startClipboardWatcher()
     }
 
     Process {
