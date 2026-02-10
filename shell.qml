@@ -564,6 +564,44 @@ ShellRoot {
                 wifiPopup.anchor.rect.height = 1
             }
 
+            function updateVolumePopupAnchor() {
+                if (!volumeIndicator || !volumePopup) {
+                    return
+                }
+                var anchorItem = bar.contentItem ? bar.contentItem : bar
+                var pos = volumeIndicator.mapToItem(anchorItem, 0, volumeIndicator.height)
+                volumePopup.anchor.rect.x = pos.x + volumeIndicator.width - Theme.volumePopupWidth
+                volumePopup.anchor.rect.y = pos.y + Theme.volumePopupOffset
+                volumePopup.anchor.rect.width = 1
+                volumePopup.anchor.rect.height = 1
+            }
+
+            function showVolumePopup(volumePercent, isMuted, isAvailable) {
+                if (!volumePopup) {
+                    return
+                }
+                volumePopup.reveal(volumePercent, isMuted, isAvailable)
+            }
+
+            function updateBrightnessPopupAnchor() {
+                if (!batteryIndicator || !brightnessPopup) {
+                    return
+                }
+                var anchorItem = bar.contentItem ? bar.contentItem : bar
+                var pos = batteryIndicator.mapToItem(anchorItem, 0, batteryIndicator.height)
+                brightnessPopup.anchor.rect.x = pos.x + batteryIndicator.width - Theme.brightnessPopupWidth
+                brightnessPopup.anchor.rect.y = pos.y + Theme.brightnessPopupOffset
+                brightnessPopup.anchor.rect.width = 1
+                brightnessPopup.anchor.rect.height = 1
+            }
+
+            function showBrightnessPopup(brightnessPercent, isAvailable) {
+                if (!brightnessPopup) {
+                    return
+                }
+                brightnessPopup.reveal(brightnessPercent, isAvailable)
+            }
+
             function updateDateWidgetPopupAnchor() {
                 if (!dateTimeIndicator) {
                     return
@@ -879,6 +917,9 @@ ShellRoot {
 
                         VolumeIndicator {
                             id: volumeIndicator
+                            onOsdRequested: function(volumePercent, muted, available) {
+                                bar.showVolumePopup(volumePercent, muted, available)
+                            }
                         }
 
                         ClipboardIndicator {
@@ -907,6 +948,9 @@ ShellRoot {
 
                         BatteryIndicator {
                             id: batteryIndicator
+                            onBrightnessOsdRequested: function(brightnessPercent, available) {
+                                bar.showBrightnessPopup(brightnessPercent, available)
+                            }
                         }
 
                         NotificationTrigger {
@@ -1020,6 +1064,16 @@ ShellRoot {
                 wifiIndicator: wifiIndicator
             }
 
+            VolumePopup {
+                id: volumePopup
+                bar: bar
+            }
+
+            BrightnessPopup {
+                id: brightnessPopup
+                bar: bar
+            }
+
             Connections {
                 target: wifiIndicator
                 function onNetworksChanged() { bar.updateWifiPopupAnchor() }
@@ -1031,12 +1085,16 @@ ShellRoot {
                 updateBluetoothPopupAnchor()
                 updateWifiPopupAnchor()
                 updateCpuPopupAnchor()
+                updateVolumePopupAnchor()
+                updateBrightnessPopupAnchor()
                 updateDateWidgetPopupAnchor()
             }
             onHeightChanged: {
                 updateBluetoothPopupAnchor()
                 updateWifiPopupAnchor()
                 updateCpuPopupAnchor()
+                updateVolumePopupAnchor()
+                updateBrightnessPopupAnchor()
                 updateDateWidgetPopupAnchor()
             }
 
@@ -1061,6 +1119,18 @@ ShellRoot {
                 target: dateTimeIndicator
                 function onWidthChanged() { bar.updateDateWidgetPopupAnchor() }
                 function onHeightChanged() { bar.updateDateWidgetPopupAnchor() }
+            }
+
+            Connections {
+                target: volumeIndicator
+                function onWidthChanged() { bar.updateVolumePopupAnchor() }
+                function onHeightChanged() { bar.updateVolumePopupAnchor() }
+            }
+
+            Connections {
+                target: batteryIndicator
+                function onWidthChanged() { bar.updateBrightnessPopupAnchor() }
+                function onHeightChanged() { bar.updateBrightnessPopupAnchor() }
             }
 
             Connections {

@@ -6,8 +6,15 @@ import "."
 Item {
     id: root
     property int volumePercent: 0
+    property int volumePercentRaw: 0
+    property int intendedVolumePercent: -1
+    property int queuedVolumePercent: -1
+    property real wheelDeltaRemainder: 0
     property bool muted: false
     property bool available: true
+    property bool pendingOsdSync: false
+
+    signal osdRequested(int volumePercent, bool muted, bool available)
 
     implicitHeight: container.implicitHeight
     implicitWidth: container.implicitWidth
@@ -18,6 +25,7 @@ Item {
             available = false
             muted = false
             volumePercent = 0
+            volumePercentRaw = 0
             return
         }
 
@@ -30,7 +38,8 @@ Item {
             var pctText = matches[matches.length - 1].replace("%", "")
             var pct = Number(pctText)
             if (!isNaN(pct)) {
-                volumePercent = Math.max(0, Math.min(100, Math.round(pct)))
+                volumePercentRaw = Math.max(0, Math.round(pct))
+                volumePercent = clampPercent(volumePercentRaw)
                 return
             }
         }
@@ -39,22 +48,76 @@ Item {
         if (volMatch && volMatch[1]) {
             var ratio = Number(volMatch[1])
             if (!isNaN(ratio)) {
-                volumePercent = Math.max(0, Math.min(100, Math.round(ratio * 100)))
+                volumePercentRaw = Math.max(0, Math.round(ratio * 100))
+                volumePercent = clampPercent(volumePercentRaw)
                 return
             }
         }
 
         volumePercent = 0
+        volumePercentRaw = 0
     }
 
-    function adjustVolume(isUp) {
+    function clampPercent(value) {
+        return Math.max(0, Math.min(100, Math.round(Number(value) || 0)))
+    }
+
+    function requestOsd(percentHint) {
+        var pct = percentHint
+        if (pct === undefined || pct === null || isNaN(Number(pct))) {
+            pct = volumePercent
+        }
+        osdRequested(clampPercent(pct), muted, available)
+    }
+
+    function queueVolumeBySteps(stepCount) {
+        if (!stepCount || stepCount === 0) {
+            return
+        }
         var step = Math.max(1, Theme.volumeStepPercent)
-        var delta = String(step) + "%" + (isUp ? "+" : "-")
+        var base = intendedVolumePercent >= 0
+            ? intendedVolumePercent
+            : clampPercent(volumePercentRaw)
+        var target = clampPercent(base + stepCount * step)
+
+        intendedVolumePercent = target
+        queuedVolumePercent = target
+        pendingOsdSync = true
+        requestOsd(target)
+        applyVolumeTimer.restart()
+    }
+
+    function queueVolumeByWheelDelta(deltaY) {
+        if (!deltaY || deltaY === 0) {
+            return
+        }
+        wheelDeltaRemainder += deltaY
+        var notch = 120
+        var steps = 0
+
+        while (Math.abs(wheelDeltaRemainder) >= notch) {
+            var dir = wheelDeltaRemainder > 0 ? 1 : -1
+            steps += dir
+            wheelDeltaRemainder -= dir * notch
+        }
+
+        if (steps !== 0) {
+            queueVolumeBySteps(steps)
+        }
+    }
+
+    function applyQueuedVolume() {
+        if (queuedVolumePercent < 0 || setVolumeProc.running) {
+            return
+        }
+        var target = queuedVolumePercent
+        queuedVolumePercent = -1
+
         setVolumeProc.command = ["sh", "-c",
             "if command -v wpctl >/dev/null 2>&1; then " +
-            "wpctl set-volume -l 1.5 @DEFAULT_AUDIO_SINK@ " + delta + "; " +
+            "wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ " + String(target) + "%; " +
             "elif command -v pactl >/dev/null 2>&1; then " +
-            "pactl set-sink-volume @DEFAULT_SINK@ " + delta + "; fi"]
+            "pactl set-sink-volume @DEFAULT_SINK@ " + String(target) + "%; fi"]
         setVolumeProc.running = true
     }
 
@@ -63,7 +126,14 @@ Item {
         command: ["sh", "-c", "if command -v wpctl >/dev/null 2>&1; then wpctl get-volume @DEFAULT_AUDIO_SINK@; elif command -v pactl >/dev/null 2>&1; then pactl get-sink-volume @DEFAULT_SINK@ | head -n1; pactl get-sink-mute @DEFAULT_SINK@; else printf '__QSERR__ missing:wpctl-or-pactl\\n'; fi"]
         running: true
         stdout: StdioCollector {
-            onStreamFinished: root.updateFromOutput(this.text)
+            onStreamFinished: {
+                root.updateFromOutput(this.text)
+                root.intendedVolumePercent = root.clampPercent(root.volumePercentRaw)
+                if (root.pendingOsdSync) {
+                    root.pendingOsdSync = false
+                    root.requestOsd(root.volumePercent)
+                }
+            }
         }
     }
 
@@ -72,8 +142,22 @@ Item {
         command: ["sh", "-c", "true"]
         running: false
         stdout: StdioCollector {
-            onStreamFinished: volumeProc.running = true
+            onStreamFinished: {
+                if (root.queuedVolumePercent >= 0) {
+                    root.applyQueuedVolume()
+                } else {
+                    volumeProc.running = true
+                }
+            }
         }
+    }
+
+    Timer {
+        id: applyVolumeTimer
+        interval: 40
+        running: false
+        repeat: false
+        onTriggered: root.applyQueuedVolume()
     }
 
     Timer {
@@ -132,10 +216,17 @@ Item {
             acceptedButtons: Qt.NoButton
             hoverEnabled: true
             onWheel: function(wheel) {
-                if (!wheel || wheel.angleDelta.y === 0) {
+                if (!wheel) {
                     return
                 }
-                root.adjustVolume(wheel.angleDelta.y > 0)
+                var deltaY = wheel.angleDelta.y
+                if (deltaY === 0 && wheel.pixelDelta && wheel.pixelDelta.y !== 0) {
+                    deltaY = wheel.pixelDelta.y * 8
+                }
+                if (deltaY === 0) {
+                    return
+                }
+                root.queueVolumeByWheelDelta(deltaY)
                 wheel.accepted = true
             }
         }

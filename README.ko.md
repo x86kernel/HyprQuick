@@ -37,6 +37,22 @@ QuickShell 기반으로 작성되었고, 좌/중/우 블록형 UI와 팝업 위�
 - (권장) `curl` 또는 `wget` (날씨/공휴일 API 호출)
 - (선택) `wpctl` 또는 `pactl` (볼륨 블록)
 
+## 설치
+
+기존 QuickShell 설정을 백업하고 이 저장소를 `~/.config/quickshell`에 배치합니다.
+
+```bash
+# 1) 기존 설정 백업
+mv ~/.config/quickshell ~/.config/quickshell.backup.$(date +%Y%m%d-%H%M%S)
+
+# 2) 이 저장소를 QuickShell 설정 경로에 클론
+git clone https://github.com/x86kernel/HyprQuick.git ~/.config/quickshell
+
+# 3) 설정 파일 생성
+cp ~/.config/quickshell/settings.example.json ~/.config/quickshell/settings.json
+```
+
+
 ## 설정
 
 먼저 샘플 파일을 복사해서 로컬 설정 파일을 만드세요:

@@ -37,6 +37,22 @@ It uses a left/center/right block layout and includes popup widgets (notificatio
 - (Recommended) `curl` or `wget` (for weather/holiday APIs)
 - (Optional) `wpctl` or `pactl` (for volume block)
 
+## Installation
+
+Back up your existing QuickShell config, then place this repository at `~/.config/quickshell`.
+
+```bash
+# 1) Back up existing config
+mv ~/.config/quickshell ~/.config/quickshell.backup.$(date +%Y%m%d-%H%M%S)
+
+# 2) Clone this repo into the QuickShell config path
+git clone https://github.com/x86kernel/HyprQuick.git ~/.config/quickshell
+
+# 3) Create your settings file
+cp ~/.config/quickshell/settings.example.json ~/.config/quickshell/settings.json
+```
+
+
 ## Configuration
 
 Start by creating your local settings file from the example:

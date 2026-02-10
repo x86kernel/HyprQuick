@@ -50,5 +50,8 @@
   "weather.loading": "Loading weather...",
   "weather.unavailable": "Weather unavailable",
 
+  "brightness.title": "Brightness",
+  "volume.muted": "Muted",
+
   "notification.empty": "No notifications"
 }

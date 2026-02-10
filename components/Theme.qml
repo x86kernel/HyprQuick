@@ -103,6 +103,16 @@ Singleton {
     property int volumePollInterval: 2000
     property int volumeStepPercent: 5
     property color volumeText: "#f5c2e7"
+    property int volumePopupWidth: 220
+    property int volumePopupPadding: 12
+    property int volumePopupRadius: 12
+    property int volumePopupOffset: 8
+    property int volumePopupDuration: 1300
+    property int volumePopupProgressHeight: 10
+    property color volumePopupBg: "#181826"
+    property color volumePopupBorder: "transparent"
+    property color volumePopupProgressBg: "#2a2a3d"
+    property color volumePopupProgressFill: "#f5c2e7"
     property int wifiPopupWidth: 560
     property int wifiPopupPadding: 12
     property int wifiPopupRadius: 12
@@ -139,6 +149,21 @@ Singleton {
     property int batteryPollInterval: 5000
     property string batteryUnavailableText: "--"
     property color batteryText: "#f5c2e7"
+    property string brightnessIcon: "󰃠"
+    property string brightnessUnavailableText: "--"
+    property int brightnessPollInterval: 2500
+    property int brightnessStepPercent: 5
+    property color brightnessText: "#f9e2af"
+    property int brightnessPopupWidth: 220
+    property int brightnessPopupPadding: 12
+    property int brightnessPopupRadius: 12
+    property int brightnessPopupOffset: 8
+    property int brightnessPopupDuration: 1300
+    property int brightnessPopupProgressHeight: 10
+    property color brightnessPopupBg: "#181826"
+    property color brightnessPopupBorder: "transparent"
+    property color brightnessPopupProgressBg: "#2a2a3d"
+    property color brightnessPopupProgressFill: "#f9e2af"
     property string vpnIcon: ""
     property int vpnPollInterval: 3000
     property color vpnText: "#cba6f7"
