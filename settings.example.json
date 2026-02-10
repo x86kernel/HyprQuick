@@ -11,6 +11,9 @@
       "countryCode": "KR"
     }
   },
+  "power": {
+    "lockCommand": ""
+  },
   "theme": {
     "font": {
       "family": "SF Pro Text",

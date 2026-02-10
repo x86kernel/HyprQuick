@@ -40,7 +40,7 @@ Item {
 
     Connections {
         target: Hyprland
-        function onActiveWorkspaceChanged() { root.requestWorkspaceRefresh() }
+        function onFocusedWorkspaceChanged() { root.requestWorkspaceRefresh() }
     }
 
     Instantiator {

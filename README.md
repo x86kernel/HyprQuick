@@ -77,6 +77,9 @@ cp settings.example.json settings.json
       "countryCode": "KR"
     }
   },
+  "power": {
+    "lockCommand": ""
+  },
   "theme": {
     "font": {
       "family": "SF Pro Text",
@@ -92,6 +95,7 @@ cp settings.example.json settings.json
 - `integrations.weather.apiKey`: WeatherAPI key
 - `integrations.weather.location`: e.g. `auto:ip`, `Seoul`, `37.56,126.97`
 - `integrations.holidays.countryCode`: holiday country code (e.g. `KR`)
+- `power.lockCommand`: lock command override (leave empty to use default)
 - `theme.font.family`: main UI font family
 - `theme.font.size`: main UI font size
 - `theme.font.iconFamily`: icon font family

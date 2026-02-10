@@ -57,6 +57,10 @@ Singleton {
     property string screenshotSaveCommandTemplate: "mkdir -p \"$HOME/Pictures/Screenshots\"; cp %FILE% \"$HOME/Pictures/Screenshots/$(date +%Y-%m-%d_%H-%M-%S).png\""
     property string screenshotCopyCommandTemplate: "wl-copy < %FILE%"
     property string screenshotDiscardCommandTemplate: "rm -f %FILE%"
+    property string powerLockCommand: "if command -v hyprlock >/dev/null 2>&1; then hyprlock; elif command -v swaylock >/dev/null 2>&1; then swaylock -f; elif command -v loginctl >/dev/null 2>&1; then loginctl lock-session; else exit 1; fi"
+    property string powerLogoutCommand: "if command -v hyprctl >/dev/null 2>&1; then hyprctl dispatch exit; elif [ -n \"$XDG_SESSION_ID\" ] && command -v loginctl >/dev/null 2>&1; then loginctl terminate-session \"$XDG_SESSION_ID\"; else exit 1; fi"
+    property string powerRebootCommand: "systemctl reboot"
+    property string powerShutdownCommand: "systemctl poweroff"
     property int screenshotPopupWidth: 560
     property int screenshotPopupHeight: 380
     property int screenshotPopupRadius: 14
@@ -226,7 +230,7 @@ Singleton {
     property int popupOffset: 8
     property color popupBg: "#181826"
     property color popupBorder: "transparent"
-    property int dateWidgetPopupWidth: 640
+    property int dateWidgetPopupWidth: 930
     property int dateWidgetPopupHeight: 330
     property int dateWidgetPopupRadius: 14
     property int dateWidgetPopupPadding: 14
@@ -234,8 +238,21 @@ Singleton {
     property int dateWidgetPopupGap: 10
     property int dateWidgetPopupOffset: 8
     property int dateWidgetNavButtonSize: 28
+    property int dateWidgetHeaderBottomMargin: 8
     property int dateWidgetCalendarGap: 6
     property int dateWidgetCalendarCellHeight: 28
+    property int powerConfirmTimeoutMs: 3200
+    property color powerPaneTitleColor: "#f5c2e7"
+    property color powerActionBg: "#1f1f31"
+    property color powerActionBorder: "#ffffff14"
+    property color powerActionDangerBg: "#3a1e2b"
+    property color powerActionDangerBorder: "#ff82b644"
+    property color powerActionConfirmBg: "#5a1f36"
+    property color powerActionConfirmBorder: "#ff82b677"
+    property color powerActionText: "#f5f5ff"
+    property color powerActionDangerText: "#ffc4dc"
+    property int powerActionIconSize: 24
+    property color powerHintColor: "#b4b7d5"
     property color holidayTextColor: "#ff9ac1"
     property color holidayDotColor: "#ff6da8"
     property int holidayDotSize: 5

@@ -77,6 +77,9 @@ cp settings.example.json settings.json
       "countryCode": "KR"
     }
   },
+  "power": {
+    "lockCommand": ""
+  },
   "theme": {
     "font": {
       "family": "SF Pro Text",
@@ -92,6 +95,7 @@ cp settings.example.json settings.json
 - `integrations.weather.apiKey`: WeatherAPI 키
 - `integrations.weather.location`: 예) `auto:ip`, `Seoul`, `37.56,126.97`
 - `integrations.holidays.countryCode`: 공휴일 국가 코드 (예: `KR`)
+- `power.lockCommand`: 잠금 커맨드 오버라이드 (비우면 기본값 사용)
 - `theme.font.family`: 기본 UI 폰트 패밀리
 - `theme.font.size`: 기본 UI 폰트 크기
 - `theme.font.iconFamily`: 아이콘 폰트 패밀리

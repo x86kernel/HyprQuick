@@ -941,6 +941,9 @@ Singleton {
                     countryCode: "KR"
                 }
             },
+            power: {
+                lockCommand: ""
+            },
             theme: {
                 font: {
                     family: Theme.fontFamily,
@@ -959,6 +962,7 @@ Singleton {
         var integrations = next.integrations || {}
         var weather = integrations.weather || {}
         var holidays = integrations.holidays || {}
+        var power = next.power || {}
         var theme = next.theme || {}
         var font = theme.font || {}
         return {
@@ -973,6 +977,9 @@ Singleton {
                 holidays: {
                     countryCode: String(holidays.countryCode !== undefined ? holidays.countryCode : (next.holidayCountryCode !== undefined ? next.holidayCountryCode : defaults.integrations.holidays.countryCode)).toUpperCase()
                 }
+            },
+            power: {
+                lockCommand: String(power.lockCommand !== undefined ? power.lockCommand : (next.powerLockCommand !== undefined ? next.powerLockCommand : defaults.power.lockCommand))
             },
             theme: {
                 font: {
@@ -1366,7 +1373,9 @@ Singleton {
         interval: Theme.weatherPollInterval
         running: true
         repeat: true
-        triggeredOnStart: true
+        // Initial fetch should run after settings are loaded in settingsReadProc.
+        // Otherwise a startup race can call weather with an empty apiKey.
+        triggeredOnStart: false
         onTriggered: state.refreshWeather(false)
     }
 

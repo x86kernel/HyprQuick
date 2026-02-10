@@ -50,6 +50,15 @@
   "weather.loading": "날씨 정보를 불러오는 중...",
   "weather.unavailable": "날씨 정보를 불러올 수 없음",
 
+  "power.title": "전원",
+  "power.lock": "잠금",
+  "power.logout": "로그아웃",
+  "power.reboot": "재부팅",
+  "power.shutdown": "종료",
+  "power.confirm_hint": "버튼을 한 번 더 눌러 실행",
+  "power.confirm_suffix": "(다시 눌러 확인)",
+  "power.running": "실행 중...",
+
   "brightness.title": "밝기",
   "volume.muted": "음소거",
   "clipboard.empty": "클립보드 항목 없음",

@@ -7,7 +7,7 @@ import "."
 Item {
     id: root
     property var monitor: null
-    property var activeWorkspace: Hyprland.activeWorkspace
+    property var activeWorkspace: Hyprland.focusedWorkspace
     property bool desktopActive: false
     property var toplevel: null
     property var mappedEntry: null
@@ -148,7 +148,7 @@ Item {
 
     Connections {
         target: Hyprland
-        function onActiveWorkspaceChanged() {
+        function onFocusedWorkspaceChanged() {
             root.requestStateRefresh()
         }
         function onActiveToplevelChanged() { root.requestStateRefresh() }

@@ -50,6 +50,15 @@
   "weather.loading": "Loading weather...",
   "weather.unavailable": "Weather unavailable",
 
+  "power.title": "Power",
+  "power.lock": "Lock",
+  "power.logout": "Logout",
+  "power.reboot": "Reboot",
+  "power.shutdown": "Shutdown",
+  "power.confirm_hint": "Press the same button again to confirm",
+  "power.confirm_suffix": "(press again)",
+  "power.running": "Running...",
+
   "brightness.title": "Brightness",
   "volume.muted": "Muted",
   "clipboard.empty": "No clipboard items",
