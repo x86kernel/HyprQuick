@@ -1,6 +1,12 @@
 {
   "common.confirm": "확인",
   "toast.screenshot_failed": "스크린샷 실패",
+  "toast.recording_started": "녹화 시작",
+  "toast.recording_stopped": "녹화 저장 완료",
+  "toast.recording_failed": "녹화 실패",
+  "toast.recording_scope_changed": "녹화 범위 변경",
+  "toast.recording_scope_region": "특정 영역",
+  "toast.recording_scope_fullscreen": "전체 화면",
 
   "calendar.day.sun": "일",
   "calendar.day.mon": "월",

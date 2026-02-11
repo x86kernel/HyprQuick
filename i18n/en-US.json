@@ -1,6 +1,12 @@
 {
   "common.confirm": "Confirm",
   "toast.screenshot_failed": "Screenshot Failed",
+  "toast.recording_started": "Recording Started",
+  "toast.recording_stopped": "Recording Saved",
+  "toast.recording_failed": "Recording Failed",
+  "toast.recording_scope_changed": "Recording Scope Changed",
+  "toast.recording_scope_region": "Selected Region",
+  "toast.recording_scope_fullscreen": "Fullscreen",
 
   "calendar.day.sun": "Sun",
   "calendar.day.mon": "Mon",

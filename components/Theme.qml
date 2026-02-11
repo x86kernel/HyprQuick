@@ -53,10 +53,26 @@ Singleton {
     property int fontWeight: Font.DemiBold
     property string notificationIcon: "󰂚"
     property string screenshotIcon: "󰄀"
+    property string screenRecordIcon: "󰻃"
+    property string screenRecordRegionIcon: "󰻃"
+    property string screenRecordFullscreenIcon: "󰍹"
+    property string screenRecordActiveIcon: "󰑊"
     property string screenshotCaptureCommand: "for c in slurp grim; do command -v \"$c\" >/dev/null 2>&1 || { printf '__QSERR__ missing:%s\\n' \"$c\"; exit 0; }; done; tmp=\"$(mktemp /tmp/qs-shot-XXXXXX.png)\"; slurp_out=\"$(slurp 2>&1)\"; slurp_status=$?; if [ \"$slurp_status\" -ne 0 ]; then rm -f \"$tmp\"; printf '__QSERR__ slurp-failed:%s\\n' \"$slurp_out\"; exit 0; fi; region=\"$slurp_out\"; grim_err=\"$(grim -g \"$region\" \"$tmp\" 2>&1)\"; grim_status=$?; if [ \"$grim_status\" -ne 0 ] || [ ! -s \"$tmp\" ]; then rm -f \"$tmp\"; printf '__QSERR__ grim-failed:%s\\n' \"$grim_err\"; exit 0; fi; printf '%s\\n' \"$tmp\""
     property string screenshotSaveCommandTemplate: "mkdir -p \"$HOME/Pictures/Screenshots\"; cp %FILE% \"$HOME/Pictures/Screenshots/$(date +%Y-%m-%d_%H-%M-%S).png\""
     property string screenshotCopyCommandTemplate: "wl-copy < %FILE%"
     property string screenshotDiscardCommandTemplate: "rm -f %FILE%"
+    property string screenRecordFileExtension: "mp4"
+    property string screenRecordStartCommandTemplate: "status=%STATUS%; pidf=%PIDFILE%; ext=%EXT%; rm -f \"$status\" \"$pidf\"; for c in slurp wf-recorder; do command -v \"$c\" >/dev/null 2>&1 || { printf '__QSERR__ missing:%s\\n' \"$c\" > \"$status\"; exit 0; }; done; region=\"$(slurp 2>/dev/null || true)\"; if [ -z \"$region\" ]; then printf '__QSCANCEL__\\n' > \"$status\"; exit 0; fi; outdir=\"$HOME/Videos/Recordings\"; mkdir -p \"$outdir\"; outfile=\"$outdir/qs-record-$(date +%Y-%m-%d_%H-%M-%S).$ext\"; wf-recorder -g \"$region\" -f \"$outfile\" >/dev/null 2>&1 & pid=$!; sleep 0.15; if kill -0 \"$pid\" 2>/dev/null; then printf '%s\\n' \"$pid\" > \"$pidf\"; printf 'READY:%s\\n' \"$outfile\" > \"$status\"; else printf '__QSERR__ recorder-start-failed\\n' > \"$status\"; fi"
+    property string screenRecordStartRegionCommandTemplate: screenRecordStartCommandTemplate
+    property string screenRecordStartFullscreenCommandTemplate: "status=%STATUS%; pidf=%PIDFILE%; ext=%EXT%; rm -f \"$status\" \"$pidf\"; command -v wf-recorder >/dev/null 2>&1 || { printf '__QSERR__ missing:wf-recorder\\n' > \"$status\"; exit 0; }; outdir=\"$HOME/Videos/Recordings\"; mkdir -p \"$outdir\"; outfile=\"$outdir/qs-record-$(date +%Y-%m-%d_%H-%M-%S).$ext\"; errf=\"/tmp/qs-rec-err-$$.log\"; outname=\"\"; if command -v hyprctl >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then outname=\"$(hyprctl monitors -j 2>/dev/null | jq -r '.[] | select(.focused == true) | .name' | head -n1)\"; fi; if [ -n \"$outname\" ]; then wf-recorder -o \"$outname\" -f \"$outfile\" >\"$errf\" 2>&1 & pid=$!; else wf-recorder -f \"$outfile\" >\"$errf\" 2>&1 & pid=$!; fi; sleep 0.35; if kill -0 \"$pid\" 2>/dev/null; then printf '%s\\n' \"$pid\" > \"$pidf\"; printf 'READY:%s\\n' \"$outfile\" > \"$status\"; else errline=\"$(head -n1 \"$errf\" 2>/dev/null)\"; if [ -n \"$errline\" ]; then printf '__QSERR__ recorder-start-failed:%s\\n' \"$errline\" > \"$status\"; else printf '__QSERR__ recorder-start-failed\\n' > \"$status\"; fi; fi; rm -f \"$errf\""
+    property string screenRecordStopCommandTemplate: "pidf=%PIDFILE%; if [ ! -s \"$pidf\" ]; then exit 1; fi; pid=\"$(cat \"$pidf\" 2>/dev/null)\"; if [ -z \"$pid\" ]; then exit 1; fi; kill -INT \"$pid\" 2>/dev/null || kill -TERM \"$pid\" 2>/dev/null || exit 1; for i in $(seq 1 40); do kill -0 \"$pid\" 2>/dev/null || exit 0; sleep 0.1; done; kill -TERM \"$pid\" 2>/dev/null || true; exit 0"
+    property string screenRecordScopeTitle: "녹화 범위를 선택하세요"
+    property string screenRecordScopeRegionText: "특정 영역 녹화"
+    property string screenRecordScopeFullscreenText: "전체 화면 녹화"
+    property int screenRecordScopePopupWidth: 190
+    property int screenRecordScopePopupPadding: 10
+    property int screenRecordScopePopupGap: 8
+    property int screenRecordScopeButtonHeight: 32
     property string powerLockCommand: "if command -v hyprlock >/dev/null 2>&1; then hyprlock; elif command -v swaylock >/dev/null 2>&1; then swaylock -f; elif command -v loginctl >/dev/null 2>&1; then loginctl lock-session; else exit 1; fi"
     property string powerLogoutCommand: "if command -v hyprctl >/dev/null 2>&1; then hyprctl dispatch exit; elif [ -n \"$XDG_SESSION_ID\" ] && command -v loginctl >/dev/null 2>&1; then loginctl terminate-session \"$XDG_SESSION_ID\"; else exit 1; fi"
     property string powerRebootCommand: "systemctl reboot"
@@ -213,6 +229,11 @@ Singleton {
     property color textPrimary: "#cdd6f4"
     property color textOnAccent: "#0b0b16"
     property color focusPipInactive: "#585b70"
+    property color screenRecordModeBg: "#3b2849"
+    property color screenRecordModeIconColor: "#f5c2e7"
+    property color screenRecordActiveColor: "#ff4d6d"
+    property color screenRecordBlinkOffColor: "#ff9bb0"
+    property int screenRecordBlinkIntervalMs: 500
 
     property color otherMonitorBg: "#242438"
     property color otherMonitorBorder: "transparent"

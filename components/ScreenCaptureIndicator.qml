@@ -1,4 +1,5 @@
 import QtQuick
+import Quickshell
 import Quickshell.Io
 import "."
 
@@ -6,23 +7,116 @@ Item {
     id: root
     signal captureCompleted(string filePath)
     signal captureFailed(string reason)
+    signal recordingStarted(string filePath)
+    signal recordingStopped(string filePath)
+    signal recordingFailed(string reason)
+    signal recordingScopeChanged(string scope)
 
     property bool awaitingResult: false
     property string pendingStatusPath: ""
     property string pendingImagePath: ""
     property int pollCount: 0
 
+    property string mode: "capture"
+    property bool awaitingRecordingStart: false
+    property bool isRecording: false
+    property bool recordScopePopupOpen: false
+    property string recordScope: "region"
+    property var parentWindow: null
+    property string pendingRecordStatusPath: ""
+    property string pendingRecordPidPath: ""
+    property string currentRecordingPath: ""
+    property int recordPollCount: 0
+    property string pendingModeAfterStop: ""
+    property bool blinkOn: false
+
     implicitHeight: container.implicitHeight
     implicitWidth: container.implicitWidth
+    onXChanged: updateRecordScopePopupAnchor()
+    onYChanged: updateRecordScopePopupAnchor()
+    onWidthChanged: updateRecordScopePopupAnchor()
+    onHeightChanged: updateRecordScopePopupAnchor()
 
     function shellQuote(text) {
         return "'" + (text || "").replace(/'/g, "'\\''") + "'"
     }
 
-    function startCapture() {
-        if (awaitingResult) {
+    function applyTemplate(template, replacements) {
+        var out = template || ""
+        var keys = Object.keys(replacements || {})
+        for (var i = 0; i < keys.length; i += 1) {
+            var key = keys[i]
+            out = out.split(key).join(replacements[key])
+        }
+        return out
+    }
+
+    function setMode(nextMode) {
+        if (nextMode !== "capture" && nextMode !== "record") {
             return
         }
+        if (mode === nextMode) {
+            return
+        }
+        mode = nextMode
+        recordScopePopupOpen = false
+    }
+
+    function openRecordScopePopup() {
+        if (mode !== "record" || awaitingRecordingStart || isRecording) {
+            return
+        }
+        recordScopePopupOpen = !recordScopePopupOpen
+        if (recordScopePopupOpen) {
+            updateRecordScopePopupAnchor()
+        }
+    }
+
+    function startRecordingWithScope(scope) {
+        if (scope !== "region" && scope !== "fullscreen") {
+            return
+        }
+        recordScope = scope
+        recordingScopeChanged(recordScope)
+        recordScopePopupOpen = false
+        startRecording()
+    }
+
+    function toggleMode() {
+        if (awaitingResult || awaitingRecordingStart) {
+            return
+        }
+        if (mode === "capture") {
+            setMode("record")
+            return
+        }
+        if (isRecording) {
+            pendingModeAfterStop = "capture"
+            stopRecording()
+            return
+        }
+        setMode("capture")
+    }
+
+    function activatePrimary() {
+        if (mode === "record") {
+            if (isRecording) {
+                recordScopePopupOpen = false
+                stopRecording()
+            } else {
+                openRecordScopePopup()
+            }
+            return
+        }
+        recordScopePopupOpen = false
+        startCapture()
+    }
+
+    function startCapture() {
+        if (awaitingResult || awaitingRecordingStart || isRecording) {
+            return
+        }
+        recordScopePopupOpen = false
 
         var token = Date.now() + "-" + Math.floor(Math.random() * 1000000)
         pendingStatusPath = "/tmp/qs-shot-status-" + token + ".txt"
@@ -67,6 +161,88 @@ Item {
         captureFailed(reason)
     }
 
+    function startRecording() {
+        if (awaitingResult || awaitingRecordingStart || isRecording) {
+            return
+        }
+        recordScopePopupOpen = false
+
+        var token = Date.now() + "-" + Math.floor(Math.random() * 1000000)
+        pendingRecordStatusPath = "/tmp/qs-rec-status-" + token + ".txt"
+        pendingRecordPidPath = "/tmp/qs-rec-pid-" + token + ".txt"
+
+        var cmdTemplate = recordScope === "fullscreen"
+            ? Theme.screenRecordStartFullscreenCommandTemplate
+            : Theme.screenRecordStartRegionCommandTemplate
+        var cmd = applyTemplate(cmdTemplate, {
+            "%STATUS%": shellQuote(pendingRecordStatusPath),
+            "%PIDFILE%": shellQuote(pendingRecordPidPath),
+            "%EXT%": shellQuote(Theme.screenRecordFileExtension)
+        })
+
+        recordLaunchProc.command = ["sh", "-c", cmd]
+        recordLaunchProc.startDetached()
+
+        recordPollCount = 0
+        awaitingRecordingStart = true
+        recordPollTimer.start()
+    }
+
+    function finishRecordingStart(reason) {
+        awaitingRecordingStart = false
+        recordPollTimer.stop()
+        recordCleanupProc.command = ["sh", "-c", "rm -f " + shellQuote(pendingRecordStatusPath)]
+        recordCleanupProc.running = true
+
+        if (reason.indexOf("READY:") === 0) {
+            currentRecordingPath = reason.slice(6).trim()
+            isRecording = currentRecordingPath.length > 0
+            blinkOn = false
+            recordBlinkTimer.start()
+            recordingStarted(currentRecordingPath)
+            return
+        }
+
+        recordCleanupProc2.command = ["sh", "-c", "rm -f " + shellQuote(pendingRecordPidPath)]
+        recordCleanupProc2.running = true
+        recordingFailed(reason)
+    }
+
+    function stopRecording() {
+        recordScopePopupOpen = false
+        if (!isRecording && !awaitingRecordingStart) {
+            if (pendingModeAfterStop.length > 0) {
+                setMode(pendingModeAfterStop)
+                pendingModeAfterStop = ""
+            }
+            return
+        }
+        if (awaitingRecordingStart) {
+            return
+        }
+        var path = currentRecordingPath
+        isRecording = false
+        blinkOn = false
+        recordBlinkTimer.stop()
+
+        var cmd = applyTemplate(Theme.screenRecordStopCommandTemplate, {
+            "%PIDFILE%": shellQuote(pendingRecordPidPath)
+        })
+        recordStopProc.recordedPath = path
+        recordStopProc.command = ["sh", "-c", cmd]
+        recordStopProc.running = true
+    }
+
+    function updateRecordScopePopupAnchor() {
+        if (!recordScopePopupWindow || !parentWindow || !recordScopePopupOpen) {
+            return
+        }
+        var anchorItem = parentWindow.contentItem ? parentWindow.contentItem : parentWindow
+        var pos = root.mapToItem(anchorItem, 0, root.height)
+        recordScopePopupWindow.anchor.rect.x = Math.round(pos.x + (root.width - recordScopePopupWindow.width) / 2)
+        recordScopePopupWindow.anchor.rect.y = Math.round(pos.y + Theme.popupOffset)
+    }
+
     Process {
         id: launchProc
     }
@@ -98,6 +274,58 @@ Item {
 
     Process { id: cleanupProc }
     Process { id: cleanupProc2 }
+    Process { id: recordLaunchProc }
+    Process {
+        id: recordReadProc
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished: {
+                if (!root.awaitingRecordingStart) {
+                    return
+                }
+                var value = this.text.trim()
+                if (value.length === 0) {
+                    return
+                }
+                if (value.indexOf("__QSCANCEL__") === 0) {
+                    root.finishRecordingStart("cancelled")
+                    return
+                }
+                if (value.indexOf("__QSERR__") === 0) {
+                    root.finishRecordingStart(value.replace("__QSERR__", "").trim())
+                    return
+                }
+                root.finishRecordingStart(value.split(/\r?\n/)[0].trim())
+            }
+        }
+    }
+    Process { id: recordCleanupProc }
+    Process { id: recordCleanupProc2 }
+    Process {
+        id: recordStopProc
+        property string recordedPath: ""
+        running: false
+        onExited: function(exitCode) {
+            var path = recordedPath
+            recordedPath = ""
+            currentRecordingPath = ""
+            recordCleanupProc2.command = ["sh", "-c", "rm -f " + shellQuote(pendingRecordPidPath)]
+            recordCleanupProc2.running = true
+
+            if (exitCode !== 0) {
+                recordingFailed("record-stop-failed")
+            } else if (path.length > 0) {
+                recordingStopped(path)
+            } else {
+                recordingStopped("")
+            }
+
+            if (pendingModeAfterStop.length > 0) {
+                setMode(pendingModeAfterStop)
+                pendingModeAfterStop = ""
+            }
+        }
+    }
 
     Timer {
         id: pollTimer
@@ -120,6 +348,35 @@ Item {
         }
     }
 
+    Timer {
+        id: recordPollTimer
+        interval: 250
+        repeat: true
+        onTriggered: {
+            if (!root.awaitingRecordingStart) {
+                stop()
+                return
+            }
+            recordPollCount += 1
+            if (recordPollCount > 160) {
+                root.finishRecordingStart("record-timeout")
+                return
+            }
+            if (!recordReadProc.running) {
+                recordReadProc.command = ["sh", "-c", "cat " + root.shellQuote(root.pendingRecordStatusPath) + " 2>/dev/null"]
+                recordReadProc.running = true
+            }
+        }
+    }
+
+    Timer {
+        id: recordBlinkTimer
+        interval: Theme.screenRecordBlinkIntervalMs
+        repeat: true
+        running: root.isRecording
+        onTriggered: root.blinkOn = !root.blinkOn
+    }
+
     Rectangle {
         id: container
         property int paddingX: Theme.blockPaddingX
@@ -128,15 +385,23 @@ Item {
         implicitHeight: Theme.blockHeight
         implicitWidth: iconLabel.implicitWidth + paddingX * 2
         radius: Theme.blockRadius
-        color: root.awaitingResult ? Theme.accentAlt : Theme.blockBg
+        color: root.awaitingResult || root.awaitingRecordingStart
+            ? Theme.accentAlt
+            : (root.mode === "record" ? Theme.screenRecordModeBg : Theme.blockBg)
         border.width: 1
-        border.color: Theme.blockBorder
+        border.color: root.isRecording ? Theme.screenRecordActiveColor : Theme.blockBorder
 
         Text {
             id: iconLabel
             anchors.centerIn: parent
-            text: Theme.screenshotIcon
-            color: Theme.textPrimary
+            text: root.isRecording
+                ? Theme.screenRecordActiveIcon
+                : (root.mode === "record"
+                    ? (root.recordScope === "fullscreen" ? Theme.screenRecordFullscreenIcon : Theme.screenRecordRegionIcon)
+                    : Theme.screenshotIcon)
+            color: root.isRecording
+                ? (root.blinkOn ? Theme.screenRecordActiveColor : Theme.screenRecordBlinkOffColor)
+                : (root.mode === "record" ? Theme.screenRecordModeIconColor : Theme.textPrimary)
             font.family: Theme.iconFontFamily
             font.pixelSize: Theme.iconSize
             font.weight: Theme.fontWeight
@@ -145,8 +410,106 @@ Item {
         MouseArea {
             anchors.fill: parent
             hoverEnabled: true
+            acceptedButtons: Qt.LeftButton | Qt.RightButton
             cursorShape: Qt.PointingHandCursor
-            onClicked: root.startCapture()
+            onClicked: function(mouse) {
+                if (mouse.button === Qt.RightButton) {
+                    root.toggleMode()
+                    return
+                }
+                root.activatePrimary()
+            }
+        }
+    }
+
+    PopupWindow {
+        id: recordScopePopupWindow
+        property real anim: root.recordScopePopupOpen ? 1 : 0
+        visible: root.parentWindow && (root.recordScopePopupOpen || anim > 0.01)
+        color: "transparent"
+        anchor.window: root.parentWindow
+        width: Theme.screenRecordScopePopupWidth
+        implicitHeight: popupContent.implicitHeight + Theme.screenRecordScopePopupPadding * 2
+        Behavior on anim { NumberAnimation { duration: Theme.controllerAnimMs; easing.type: Easing.OutCubic } }
+        onVisibleChanged: {
+            if (visible) {
+                root.updateRecordScopePopupAnchor()
+            }
+        }
+
+        Rectangle {
+            anchors.fill: parent
+            radius: Theme.popupRadius
+            color: Theme.popupBg
+            border.width: 1
+            border.color: Theme.popupBorder
+            opacity: recordScopePopupWindow.anim
+            scale: 0.98 + 0.02 * recordScopePopupWindow.anim
+
+            Column {
+                id: popupContent
+                anchors.fill: parent
+                anchors.margins: Theme.screenRecordScopePopupPadding
+                spacing: Theme.screenRecordScopePopupGap
+
+                Text {
+                    text: Theme.screenRecordScopeTitle
+                    color: Theme.textPrimary
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSize
+                    font.weight: Theme.fontWeight
+                }
+
+                Rectangle {
+                    width: parent.width
+                    height: Theme.screenRecordScopeButtonHeight
+                    radius: Theme.blockRadius
+                    color: Theme.blockBg
+                    border.width: 1
+                    border.color: Theme.blockBorder
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: Theme.screenRecordScopeRegionText
+                        color: Theme.textPrimary
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.fontSize
+                        font.weight: Theme.fontWeight
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.startRecordingWithScope("region")
+                    }
+                }
+
+                Rectangle {
+                    width: parent.width
+                    height: Theme.screenRecordScopeButtonHeight
+                    radius: Theme.blockRadius
+                    color: Theme.blockBg
+                    border.width: 1
+                    border.color: Theme.blockBorder
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: Theme.screenRecordScopeFullscreenText
+                        color: Theme.textPrimary
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.fontSize
+                        font.weight: Theme.fontWeight
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.startRecordingWithScope("fullscreen")
+                    }
+                }
+            }
         }
     }
 }

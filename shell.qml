@@ -613,6 +613,7 @@ ShellRoot {
 
                 ScreenCaptureIndicator {
                     id: screenCaptureIndicator
+                    parentWindow: bar
                     onCaptureCompleted: function(filePath) {
                         bar.openScreenshotPreview(filePath)
                     }
@@ -629,6 +630,23 @@ ShellRoot {
                         screenshotPopup.tempPath = ""
                         screenshotPopup.errorText = reason
                         screenshotPopup.open = true
+                    }
+                    onRecordingStopped: function(filePath) {
+                        bar.appendToast({
+                            summary: I18n.t("toast.recording_stopped"),
+                            body: filePath && filePath.length > 0 ? filePath : "",
+                            appName: "QuickShell"
+                        })
+                    }
+                    onRecordingFailed: function(reason) {
+                        if (reason === "cancelled") {
+                            return
+                        }
+                        bar.appendToast({
+                            summary: I18n.t("toast.recording_failed"),
+                            body: reason,
+                            appName: "QuickShell"
+                        })
                     }
                 }
             }
