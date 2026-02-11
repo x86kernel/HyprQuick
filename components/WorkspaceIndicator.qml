@@ -13,11 +13,14 @@ Item {
     property real highlightH: 0
     property bool highlightVisible: false
     property string highlightLabel: ""
+    property bool highlightUrgent: false
     property int edgePadLeft: 0
     property int edgePadRight: 0
     property var currentKey: null
     property var targetKey: null
     property real uniformWidth: 0
+    property int urgentRevision: 0
+    property int urgentPollIntervalMs: 1200
 
     implicitHeight: container.implicitHeight
     implicitWidth: container.implicitWidth
@@ -49,6 +52,36 @@ Item {
         delegate: QtObject {}
         onObjectAdded: function() { root.requestWorkspaceRefresh() }
         onObjectRemoved: function() { root.requestWorkspaceRefresh() }
+    }
+
+    Instantiator {
+        id: toplevelUrgencyWatcher
+        model: Hyprland.toplevels
+        delegate: Item {
+            visible: false
+            width: 0
+            height: 0
+            property var topObj: modelData
+            Connections {
+                target: topObj
+                ignoreUnknownSignals: true
+                function onLastIpcObjectChanged() { root.requestUrgentRefresh() }
+                function onActivatedChanged() { root.requestUrgentRefresh() }
+                function onUrgentChanged() { root.requestUrgentRefresh() }
+                function onAttentionChanged() { root.requestUrgentRefresh() }
+                function onTitleChanged() { root.requestUrgentRefresh() }
+            }
+        }
+        onObjectAdded: function() { root.requestUrgentRefresh() }
+        onObjectRemoved: function() { root.requestUrgentRefresh() }
+    }
+
+    Timer {
+        id: urgentPoll
+        interval: root.urgentPollIntervalMs
+        repeat: true
+        running: true
+        onTriggered: root.requestUrgentRefresh()
     }
 
     function applyNextStep() {
@@ -123,6 +156,89 @@ Item {
 
     function updateEdgePadding() {}
 
+    function requestUrgentRefresh() {
+        urgentRevision += 1
+    }
+
+    function modelCount(model) {
+        if (!model) return 0
+        if (model.values !== undefined && model.values.length !== undefined) return model.values.length
+        if (model.count !== undefined) return model.count
+        if (model.length !== undefined) return model.length
+        return 0
+    }
+
+    function modelGet(model, index) {
+        if (!model) return null
+        if (model.values !== undefined) return model.values[index]
+        if (model.get !== undefined) return model.get(index)
+        return model[index]
+    }
+
+    function workspaceIdFrom(value) {
+        if (value === null || value === undefined) {
+            return null
+        }
+        return value.id !== undefined ? value.id : value
+    }
+
+    function normalizeWorkspaceId(value) {
+        var wsId = workspaceIdFrom(value)
+        if (wsId === null || wsId === undefined) {
+            return null
+        }
+        var n = Number(wsId)
+        if (!isNaN(n)) {
+            return n
+        }
+        return String(wsId)
+    }
+
+    function workspaceIdEquals(a, b) {
+        var na = normalizeWorkspaceId(a)
+        var nb = normalizeWorkspaceId(b)
+        return na !== null && nb !== null && na === nb
+    }
+
+    function toplevelIsUrgent(toplevel) {
+        if (!toplevel || !toplevel.lastIpcObject) {
+            return false
+        }
+        var ipc = toplevel.lastIpcObject
+        return !!(
+            ipc.urgent
+            || ipc.attention
+            || ipc.demandsAttention
+            || ipc.demands_attention
+            || toplevel.urgent
+            || toplevel.attention
+            || toplevel.demandsAttention
+            || toplevel.demands_attention
+        )
+    }
+
+    function workspaceHasUrgent(workspace, revisionToken) {
+        var _unused = revisionToken
+        if (!workspace) {
+            return false
+        }
+        var wsId = normalizeWorkspaceId(workspace.id)
+        if (wsId === null) {
+            return false
+        }
+        var count = modelCount(Hyprland.toplevels)
+        for (var i = 0; i < count; i += 1) {
+            var top = modelGet(Hyprland.toplevels, i)
+            if (!top || !top.lastIpcObject || !toplevelIsUrgent(top)) {
+                continue
+            }
+            if (workspaceIdEquals(top.lastIpcObject.workspace, wsId)) {
+                return true
+            }
+        }
+        return false
+    }
+
     function updateUniformWidth() {
         var maxWidth = 0
         for (var i = 0; i < row.children.length; i += 1) {
@@ -146,6 +262,7 @@ Item {
         highlightLabel = pill.workspace.name && pill.workspace.name.length > 0
             ? pill.workspace.name
             : pill.workspace.id
+        highlightUrgent = pill.isUrgent
         if (currentKey === null) {
             var pos = pill.mapToItem(row, 0, 0)
             highlightX = pos.x
@@ -194,6 +311,7 @@ Item {
                     property bool hasWindows: workspace.lastIpcObject
                         ? workspace.lastIpcObject.windows > 0
                         : false
+                    property bool isUrgent: root.workspaceHasUrgent(workspace, root.urgentRevision)
                     property real baseWidth: Math.max(30, label.implicitWidth + 16)
 
                     visible: workspace.active || hasWindows
@@ -203,11 +321,11 @@ Item {
                     radius: Theme.blockRadius
                     color: displayFocused
                         ? "transparent"
-                        : Theme.blockBg
+                        : (isUrgent ? Theme.workspaceUrgentBg : Theme.blockBg)
                     border.width: displayFocused ? 0 : 1
                     border.color: displayFocused
                         ? Theme.accent
-                        : Theme.blockBorder
+                        : (isUrgent ? Theme.workspaceUrgentBorder : Theme.blockBorder)
 
                     function updateHighlight() {
                         if (!workspace.focused) {
@@ -250,7 +368,7 @@ Item {
                         anchors.centerIn: parent
                         z: 3
                         text: workspace.name && workspace.name.length > 0 ? workspace.name : workspace.id
-                        color: Theme.textPrimary
+                        color: isUrgent ? Theme.workspaceUrgentText : Theme.textPrimary
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontSize
                         font.weight: Theme.fontWeight
@@ -274,7 +392,7 @@ Item {
                 width: root.highlightW
                 height: root.highlightH
                 radius: Theme.blockRadius
-                color: Theme.accent
+                color: root.highlightUrgent ? Theme.workspaceUrgentBg : Theme.accent
                 opacity: root.highlightVisible ? 0.85 : 0
                 Behavior on x { NumberAnimation { duration: root.stepDurationMs; easing.type: Easing.OutCubic } }
                 Behavior on y { NumberAnimation { duration: root.stepDurationMs; easing.type: Easing.OutCubic } }
