@@ -18,6 +18,8 @@ Item {
     property int edgePadRight: 0
     property var currentKey: null
     property var targetKey: null
+    property var focusedKey: null
+    property var previousFocusedKey: null
     property real uniformWidth: 0
     property int urgentRevision: 0
     property int urgentPollIntervalMs: 1200
@@ -35,6 +37,7 @@ Item {
     function requestWorkspaceRefresh() {
         // Avoid forcing Hyprland refresh on every workspace change.
         // Model updates already come through Hyprland.workspaces signals.
+        root.syncFocusedKeys()
         root.updateUniformWidth()
         Qt.callLater(function() { root.applyNextStep() })
     }
@@ -43,7 +46,10 @@ Item {
 
     Connections {
         target: Hyprland
-        function onFocusedWorkspaceChanged() { root.requestWorkspaceRefresh() }
+        function onFocusedWorkspaceChanged() {
+            root.syncFocusedKeys()
+            root.requestWorkspaceRefresh()
+        }
     }
 
     Instantiator {
@@ -253,6 +259,45 @@ Item {
         uniformWidth = maxWidth
     }
 
+    function focusedWorkspaceId() {
+        if (Hyprland.focusedWorkspace && Hyprland.focusedWorkspace.id !== undefined) {
+            return Hyprland.focusedWorkspace.id
+        }
+        for (var i = 0; i < row.children.length; i += 1) {
+            var child = row.children[i]
+            if (!child || child.objectName !== "workspacePill" || !child.workspace) {
+                continue
+            }
+            if (child.workspace.focused) {
+                return child.workspace.id
+            }
+        }
+        return null
+    }
+
+    function syncFocusedKeys() {
+        var next = focusedWorkspaceId()
+        if (next === null || next === undefined) {
+            return
+        }
+        if (focusedKey === null || focusedKey === undefined) {
+            focusedKey = next
+            previousFocusedKey = next
+            return
+        }
+        if (focusedKey !== next) {
+            previousFocusedKey = focusedKey
+            focusedKey = next
+        }
+    }
+
+    function canUseAsStepStart(list, key) {
+        if (key === null || key === undefined) {
+            return false
+        }
+        return indexOfKey(list, key) !== -1
+    }
+
 
     function startStepTo(pill) {
         if (!pill || !pill.workspace) {
@@ -263,6 +308,10 @@ Item {
             ? pill.workspace.name
             : pill.workspace.id
         highlightUrgent = pill.isUrgent
+        var list = collectVisiblePills()
+        if (pill.workspace.focused && canUseAsStepStart(list, previousFocusedKey) && previousFocusedKey !== targetKey) {
+            currentKey = previousFocusedKey
+        }
         if (currentKey === null) {
             var pos = pill.mapToItem(row, 0, 0)
             highlightX = pos.x
