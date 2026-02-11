@@ -21,6 +21,11 @@ Item {
     property bool awaitingRecordingStart: false
     property bool isRecording: false
     property bool recordScopePopupOpen: false
+    property string scopePopupMode: "capture"
+    property string captureScope: "region"
+    property bool captureDelayActive: false
+    property int captureDelayRemaining: 0
+    property bool capturePreparing: false
     property string recordScope: "region"
     property var parentWindow: null
     property string pendingRecordStatusPath: ""
@@ -60,16 +65,31 @@ Item {
         }
         mode = nextMode
         recordScopePopupOpen = false
+        cancelCaptureDelay()
+        capturePreparing = false
     }
 
-    function openRecordScopePopup() {
-        if (mode !== "record" || awaitingRecordingStart || isRecording) {
+    function openScopePopup(forMode) {
+        if (awaitingRecordingStart || awaitingResult || isRecording || captureDelayActive || capturePreparing) {
             return
         }
+        if (forMode !== "capture" && forMode !== "record") {
+            return
+        }
+        scopePopupMode = forMode
         recordScopePopupOpen = !recordScopePopupOpen
         if (recordScopePopupOpen) {
             updateRecordScopePopupAnchor()
         }
+    }
+
+    function startCaptureWithScope(scope) {
+        if (scope !== "region" && scope !== "fullscreen") {
+            return
+        }
+        captureScope = scope
+        recordScopePopupOpen = false
+        startCapture()
     }
 
     function startRecordingWithScope(scope) {
@@ -83,9 +103,10 @@ Item {
     }
 
     function toggleMode() {
-        if (awaitingResult || awaitingRecordingStart) {
+        if (awaitingResult || awaitingRecordingStart || capturePreparing) {
             return
         }
+        cancelCaptureDelay()
         if (mode === "capture") {
             setMode("record")
             return
@@ -104,31 +125,31 @@ Item {
                 recordScopePopupOpen = false
                 stopRecording()
             } else {
-                openRecordScopePopup()
+                openScopePopup("record")
             }
             return
         }
-        recordScopePopupOpen = false
-        startCapture()
+        openScopePopup("capture")
     }
 
-    function startCapture() {
-        if (awaitingResult || awaitingRecordingStart || isRecording) {
-            return
-        }
-        recordScopePopupOpen = false
+    function cancelCaptureDelay() {
+        captureDelayActive = false
+        captureDelayRemaining = 0
+        captureDelayTimer.stop()
+    }
 
+    function launchCaptureProcess() {
         var token = Date.now() + "-" + Math.floor(Math.random() * 1000000)
         pendingStatusPath = "/tmp/qs-shot-status-" + token + ".txt"
         pendingImagePath = "/tmp/qs-shot-image-" + token + ".png"
 
-        var cmd = "status=" + shellQuote(pendingStatusPath)
-            + "; img=" + shellQuote(pendingImagePath)
-            + "; rm -f \"$status\" \"$img\";"
-            + " region=\"$(slurp 2>/dev/null || true)\";"
-            + " if [ -z \"$region\" ]; then printf '__QSCANCEL__\\n' > \"$status\"; exit 0; fi;"
-            + " if grim -g \"$region\" \"$img\" && [ -s \"$img\" ]; then printf '%s\\n' \"$img\" > \"$status\";"
-            + " else printf '__QSERR__ capture-failed\\n' > \"$status\"; rm -f \"$img\"; fi"
+        var cmdTemplate = captureScope === "fullscreen"
+            ? Theme.screenshotCaptureFullscreenCommandTemplate
+            : Theme.screenshotCaptureRegionCommandTemplate
+        var cmd = applyTemplate(cmdTemplate, {
+            "%STATUS%": shellQuote(pendingStatusPath),
+            "%FILE%": shellQuote(pendingImagePath)
+        })
 
         launchProc.command = ["sh", "-c", cmd]
         launchProc.startDetached()
@@ -138,7 +159,38 @@ Item {
         pollTimer.start()
     }
 
+    function beginCaptureDelay() {
+        var seconds = Math.max(1, Math.round(Number(Theme.screenshotFullscreenDelaySeconds) || 0))
+        captureDelayRemaining = seconds
+        captureDelayActive = true
+        captureDelayTimer.start()
+    }
+
+    function runCaptureNow() {
+        cancelCaptureDelay()
+        recordScopePopupOpen = false
+        capturePreparing = true
+        preCaptureFlashTimer.start()
+    }
+
+    function startCapture() {
+        if (awaitingResult || awaitingRecordingStart || isRecording || captureDelayActive || capturePreparing) {
+            return
+        }
+        recordScopePopupOpen = false
+
+        if (captureScope === "fullscreen" && Theme.screenshotFullscreenDelaySeconds > 0) {
+            beginCaptureDelay()
+            return
+        }
+        runCaptureNow()
+    }
+
     function finishCapture(reason) {
+        cancelCaptureDelay()
+        capturePreparing = false
+        preCaptureFlashTimer.stop()
+        postPrepareTimer.stop()
         awaitingResult = false
         pollTimer.stop()
         cleanupProc.command = ["sh", "-c", "rm -f " + shellQuote(pendingStatusPath)]
@@ -349,6 +401,40 @@ Item {
     }
 
     Timer {
+        id: captureDelayTimer
+        interval: 1000
+        repeat: true
+        onTriggered: {
+            if (!root.captureDelayActive) {
+                stop()
+                return
+            }
+            root.captureDelayRemaining -= 1
+            if (root.captureDelayRemaining <= 0) {
+                stop()
+                root.runCaptureNow()
+            }
+        }
+    }
+
+    Timer {
+        id: preCaptureFlashTimer
+        interval: Math.max(0, Theme.screenshotPreCaptureUiDelayMs)
+        repeat: false
+        onTriggered: {
+            root.capturePreparing = false
+            postPrepareTimer.start()
+        }
+    }
+
+    Timer {
+        id: postPrepareTimer
+        interval: Math.max(0, Theme.screenshotPostPrepareDelayMs)
+        repeat: false
+        onTriggered: root.launchCaptureProcess()
+    }
+
+    Timer {
         id: recordPollTimer
         interval: 250
         repeat: true
@@ -385,7 +471,7 @@ Item {
         implicitHeight: Theme.blockHeight
         implicitWidth: iconLabel.implicitWidth + paddingX * 2
         radius: Theme.blockRadius
-        color: root.awaitingResult || root.awaitingRecordingStart
+        color: root.awaitingRecordingStart || root.capturePreparing
             ? Theme.accentAlt
             : (root.mode === "record" ? Theme.screenRecordModeBg : Theme.blockBg)
         border.width: 1
@@ -394,14 +480,19 @@ Item {
         Text {
             id: iconLabel
             anchors.centerIn: parent
-            text: root.isRecording
+            text: root.captureDelayActive
+                ? String(root.captureDelayRemaining)
+                : (root.isRecording
                 ? Theme.screenRecordActiveIcon
                 : (root.mode === "record"
                     ? (root.recordScope === "fullscreen" ? Theme.screenRecordFullscreenIcon : Theme.screenRecordRegionIcon)
-                    : Theme.screenshotIcon)
+                    : (root.captureScope === "fullscreen" ? Theme.screenshotFullscreenIcon : Theme.screenshotRegionIcon)))
             color: root.isRecording
                 ? (root.blinkOn ? Theme.screenRecordActiveColor : Theme.screenRecordBlinkOffColor)
-                : (root.mode === "record" ? Theme.screenRecordModeIconColor : Theme.textPrimary)
+                : (root.capturePreparing ? Theme.textOnAccent
+                : (root.captureDelayActive
+                    ? Theme.accent
+                    : (root.mode === "record" ? Theme.screenRecordModeIconColor : Theme.textPrimary)))
             font.family: Theme.iconFontFamily
             font.pixelSize: Theme.iconSize
             font.weight: Theme.fontWeight
@@ -415,6 +506,10 @@ Item {
             onClicked: function(mouse) {
                 if (mouse.button === Qt.RightButton) {
                     root.toggleMode()
+                    return
+                }
+                if (root.captureDelayActive) {
+                    root.cancelCaptureDelay()
                     return
                 }
                 root.activatePrimary()
@@ -453,7 +548,9 @@ Item {
                 spacing: Theme.screenRecordScopePopupGap
 
                 Text {
-                    text: Theme.screenRecordScopeTitle
+                    text: root.scopePopupMode === "record"
+                        ? Theme.screenRecordScopeTitle
+                        : Theme.screenshotScopeTitle
                     color: Theme.textPrimary
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.fontSize
@@ -470,7 +567,9 @@ Item {
 
                     Text {
                         anchors.centerIn: parent
-                        text: Theme.screenRecordScopeRegionText
+                        text: root.scopePopupMode === "record"
+                            ? Theme.screenRecordScopeRegionText
+                            : Theme.screenshotScopeRegionText
                         color: Theme.textPrimary
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontSize
@@ -481,7 +580,13 @@ Item {
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: root.startRecordingWithScope("region")
+                        onClicked: {
+                            if (root.scopePopupMode === "record") {
+                                root.startRecordingWithScope("region")
+                            } else {
+                                root.startCaptureWithScope("region")
+                            }
+                        }
                     }
                 }
 
@@ -495,7 +600,9 @@ Item {
 
                     Text {
                         anchors.centerIn: parent
-                        text: Theme.screenRecordScopeFullscreenText
+                        text: root.scopePopupMode === "record"
+                            ? Theme.screenRecordScopeFullscreenText
+                            : Theme.screenshotScopeFullscreenText
                         color: Theme.textPrimary
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontSize
@@ -506,7 +613,13 @@ Item {
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: root.startRecordingWithScope("fullscreen")
+                        onClicked: {
+                            if (root.scopePopupMode === "record") {
+                                root.startRecordingWithScope("fullscreen")
+                            } else {
+                                root.startCaptureWithScope("fullscreen")
+                            }
+                        }
                     }
                 }
             }

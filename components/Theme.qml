@@ -53,11 +53,18 @@ Singleton {
     property int fontWeight: Font.DemiBold
     property string notificationIcon: "󰂚"
     property string screenshotIcon: "󰄀"
+    property string screenshotRegionIcon: "󰄀"
+    property string screenshotFullscreenIcon: "󰹑"
     property string screenRecordIcon: "󰻃"
     property string screenRecordRegionIcon: "󰻃"
     property string screenRecordFullscreenIcon: "󰍹"
     property string screenRecordActiveIcon: "󰑊"
     property string screenshotCaptureCommand: "for c in slurp grim; do command -v \"$c\" >/dev/null 2>&1 || { printf '__QSERR__ missing:%s\\n' \"$c\"; exit 0; }; done; tmp=\"$(mktemp /tmp/qs-shot-XXXXXX.png)\"; slurp_out=\"$(slurp 2>&1)\"; slurp_status=$?; if [ \"$slurp_status\" -ne 0 ]; then rm -f \"$tmp\"; printf '__QSERR__ slurp-failed:%s\\n' \"$slurp_out\"; exit 0; fi; region=\"$slurp_out\"; grim_err=\"$(grim -g \"$region\" \"$tmp\" 2>&1)\"; grim_status=$?; if [ \"$grim_status\" -ne 0 ] || [ ! -s \"$tmp\" ]; then rm -f \"$tmp\"; printf '__QSERR__ grim-failed:%s\\n' \"$grim_err\"; exit 0; fi; printf '%s\\n' \"$tmp\""
+    property string screenshotCaptureRegionCommandTemplate: "status=%STATUS%; img=%FILE%; rm -f \"$status\" \"$img\"; for c in slurp grim; do command -v \"$c\" >/dev/null 2>&1 || { printf '__QSERR__ missing:%s\\n' \"$c\" > \"$status\"; exit 0; }; done; region=\"$(slurp 2>/dev/null || true)\"; if [ -z \"$region\" ]; then printf '__QSCANCEL__\\n' > \"$status\"; exit 0; fi; if grim -g \"$region\" \"$img\" >/dev/null 2>&1 && [ -s \"$img\" ]; then printf '%s\\n' \"$img\" > \"$status\"; else printf '__QSERR__ capture-failed\\n' > \"$status\"; rm -f \"$img\"; fi"
+    property string screenshotCaptureFullscreenCommandTemplate: "status=%STATUS%; img=%FILE%; rm -f \"$status\" \"$img\"; command -v grim >/dev/null 2>&1 || { printf '__QSERR__ missing:grim\\n' > \"$status\"; exit 0; }; errf=\"/tmp/qs-shot-err-$$.log\"; outname=\"\"; if command -v hyprctl >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then outname=\"$(hyprctl monitors -j 2>/dev/null | jq -r '.[] | select(.focused == true) | .name' | head -n1)\"; fi; if [ -n \"$outname\" ]; then grim -o \"$outname\" \"$img\" >\"$errf\" 2>&1; else grim \"$img\" >\"$errf\" 2>&1; fi; if [ -s \"$img\" ]; then printf '%s\\n' \"$img\" > \"$status\"; else errline=\"$(head -n1 \"$errf\" 2>/dev/null)\"; if [ -n \"$errline\" ]; then printf '__QSERR__ capture-failed:%s\\n' \"$errline\" > \"$status\"; else printf '__QSERR__ capture-failed\\n' > \"$status\"; fi; rm -f \"$img\"; fi; rm -f \"$errf\""
+    property int screenshotFullscreenDelaySeconds: 5
+    property int screenshotPreCaptureUiDelayMs: 130
+    property int screenshotPostPrepareDelayMs: 70
     property string screenshotSaveCommandTemplate: "mkdir -p \"$HOME/Pictures/Screenshots\"; cp %FILE% \"$HOME/Pictures/Screenshots/$(date +%Y-%m-%d_%H-%M-%S).png\""
     property string screenshotCopyCommandTemplate: "wl-copy < %FILE%"
     property string screenshotDiscardCommandTemplate: "rm -f %FILE%"
@@ -69,6 +76,9 @@ Singleton {
     property string screenRecordScopeTitle: "녹화 범위를 선택하세요"
     property string screenRecordScopeRegionText: "특정 영역 녹화"
     property string screenRecordScopeFullscreenText: "전체 화면 녹화"
+    property string screenshotScopeTitle: "캡처 범위를 선택하세요"
+    property string screenshotScopeRegionText: "특정 영역 캡처"
+    property string screenshotScopeFullscreenText: "전체 화면 캡처"
     property int screenRecordScopePopupWidth: 190
     property int screenRecordScopePopupPadding: 10
     property int screenRecordScopePopupGap: 8
