@@ -949,7 +949,24 @@ Singleton {
                     family: Theme.fontFamily,
                     size: Theme.fontSize,
                     iconFamily: Theme.iconFontFamily,
-                    iconSize: Theme.iconSize
+                    iconSize: Theme.iconSize,
+                    weight: Theme.fontWeight
+                },
+                colors: {
+                    accent: String(Theme.accent),
+                    accentAlt: String(Theme.accentAlt),
+                    blockBg: String(Theme.blockBg),
+                    blockBorder: String(Theme.blockBorder),
+                    textPrimary: String(Theme.textPrimary),
+                    textOnAccent: String(Theme.textOnAccent)
+                },
+                customPalette: ["#f5c2e7", "#b4befe", "#cba6f7", "#89b4fa", "#a6e3a1", "#f9e2af", "#f38ba8", "#242438"]
+            },
+            bar: {
+                layout: {
+                    left: ["workspace", "focusedWindow", "media"],
+                    center: ["vpn", "clock", "screenCapture"],
+                    right: ["systemTray", "volume", "clipboard", "cpu", "memory", "bluetooth", "wifi", "battery", "notifications"]
                 }
             }
         }
@@ -965,6 +982,86 @@ Singleton {
         var power = next.power || {}
         var theme = next.theme || {}
         var font = theme.font || {}
+        var colors = theme.colors || {}
+        var customPalette = theme.customPalette || []
+        var bar = next.bar || {}
+        var layout = bar.layout || {}
+        var allowedLeft = { workspace: true, focusedWindow: true, media: true }
+        var allowedCenter = { vpn: true, clock: true, screenCapture: true }
+        var allowedRight = {
+            systemTray: true,
+            volume: true,
+            clipboard: true,
+            cpu: true,
+            memory: true,
+            bluetooth: true,
+            wifi: true,
+            battery: true,
+            notifications: true
+        }
+
+        function normalizedColor(value, fallback) {
+            var text = String(value !== undefined ? value : fallback).trim()
+            return text.length > 0 ? text : String(fallback)
+        }
+
+        function normalizeZoneLayout(inputList, allowedMap, fallbackList) {
+            var source = inputList
+            if (!source || source.length === undefined) {
+                source = fallbackList
+            }
+            var out = []
+            var seen = {}
+            for (var i = 0; i < source.length; i += 1) {
+                var key = String(source[i] || "")
+                if (!allowedMap[key] || seen[key]) {
+                    continue
+                }
+                seen[key] = true
+                out.push(key)
+            }
+            if (out.length === 0) {
+                for (var j = 0; j < fallbackList.length; j += 1) {
+                    out.push(fallbackList[j])
+                }
+            }
+            return out
+        }
+
+        function isHexColor(value) {
+            return /^#[0-9a-fA-F]{6}$/.test(String(value || "").trim())
+        }
+
+        function normalizeCustomPalette(list, fallbackList) {
+            var source = list
+            if (!source || source.length === undefined) {
+                source = fallbackList
+            }
+            var out = []
+            var seen = {}
+            for (var i = 0; i < source.length; i += 1) {
+                var raw = String(source[i] || "").trim()
+                if (raw.length === 0) {
+                    continue
+                }
+                var key = raw.toLowerCase()
+                if (seen[key] || !isHexColor(raw)) {
+                    continue
+                }
+                seen[key] = true
+                if (key === "#ffffff" || key === "#000000") {
+                    continue
+                }
+                out.push(raw)
+            }
+            if (out.length === 0) {
+                for (var j = 0; j < fallbackList.length; j += 1) {
+                    out.push(fallbackList[j])
+                }
+            }
+            return out
+        }
+
         return {
             general: {
                 locale: I18n.normalizeLocale(general.locale !== undefined ? general.locale : (next.locale !== undefined ? next.locale : defaults.general.locale))
@@ -986,7 +1083,25 @@ Singleton {
                     family: String(font.family !== undefined ? font.family : defaults.theme.font.family),
                     size: Math.max(8, Number(font.size !== undefined ? font.size : defaults.theme.font.size) || defaults.theme.font.size),
                     iconFamily: String(font.iconFamily !== undefined ? font.iconFamily : defaults.theme.font.iconFamily),
-                    iconSize: Math.max(8, Number(font.iconSize !== undefined ? font.iconSize : defaults.theme.font.iconSize) || defaults.theme.font.iconSize)
+                    iconSize: Math.max(8, Number(font.iconSize !== undefined ? font.iconSize : defaults.theme.font.iconSize) || defaults.theme.font.iconSize),
+                    weight: Math.max(1, Math.min(1000,
+                        Math.round(Number(font.weight !== undefined ? font.weight : defaults.theme.font.weight) || defaults.theme.font.weight)))
+                },
+                colors: {
+                    accent: normalizedColor(colors.accent, defaults.theme.colors.accent),
+                    accentAlt: normalizedColor(colors.accentAlt, defaults.theme.colors.accentAlt),
+                    blockBg: normalizedColor(colors.blockBg, defaults.theme.colors.blockBg),
+                    blockBorder: normalizedColor(colors.blockBorder, defaults.theme.colors.blockBorder),
+                    textPrimary: normalizedColor(colors.textPrimary, defaults.theme.colors.textPrimary),
+                    textOnAccent: normalizedColor(colors.textOnAccent, defaults.theme.colors.textOnAccent)
+                },
+                customPalette: normalizeCustomPalette(customPalette, defaults.theme.customPalette)
+            },
+            bar: {
+                layout: {
+                    left: normalizeZoneLayout(layout.left, allowedLeft, defaults.bar.layout.left),
+                    center: normalizeZoneLayout(layout.center, allowedCenter, defaults.bar.layout.center),
+                    right: normalizeZoneLayout(layout.right, allowedRight, defaults.bar.layout.right)
                 }
             }
         }
@@ -1010,10 +1125,18 @@ Singleton {
 
     function applyThemeSettings() {
         var font = appSettings.theme.font
+        var colors = appSettings.theme.colors
         Theme.fontFamily = font.family
         Theme.fontSize = Math.round(font.size)
         Theme.iconFontFamily = font.iconFamily
         Theme.iconSize = Math.round(font.iconSize)
+        Theme.fontWeight = Math.round(font.weight)
+        Theme.accent = colors.accent
+        Theme.accentAlt = colors.accentAlt
+        Theme.blockBg = colors.blockBg
+        Theme.blockBorder = colors.blockBorder
+        Theme.textPrimary = colors.textPrimary
+        Theme.textOnAccent = colors.textOnAccent
     }
 
     function applyRuntimeSettings() {
@@ -1051,6 +1174,15 @@ Singleton {
         settingsWriteProc.running = true
     }
 
+    function replaceSettings(nextRaw) {
+        appSettings = normalizedSettings(nextRaw || {})
+        saveSettings()
+        applyRuntimeSettings()
+        holidayLoadedKey = ""
+        ensureHolidayYear(calendarMonthDate.getFullYear())
+        refreshWeather(true)
+    }
+
     function updateSetting(key, value) {
         var next = normalizedSettings(appSettings)
         var mapped = key
@@ -1070,6 +1202,8 @@ Singleton {
             mapped = "theme.font.iconFamily"
         else if (key === "iconSize")
             mapped = "theme.font.iconSize"
+        else if (key === "fontWeight")
+            mapped = "theme.font.weight"
 
         var parts = mapped.split(".")
         var cursor = next
@@ -1094,7 +1228,7 @@ Singleton {
             refreshWeather(true)
             return
         }
-        if (mapped.indexOf("theme.font.") === 0) {
+        if (mapped.indexOf("theme.") === 0) {
             applyThemeSettings()
         }
     }

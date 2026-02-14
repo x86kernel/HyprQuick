@@ -85,7 +85,8 @@ cp settings.example.json settings.json
       "family": "SF Pro Text",
       "size": 13,
       "iconFamily": "SauceCodePro Nerd Font",
-      "iconSize": 15
+      "iconSize": 15,
+      "weight": 600
     }
   }
 }
@@ -100,6 +101,7 @@ cp settings.example.json settings.json
 - `theme.font.size`: 기본 UI 폰트 크기
 - `theme.font.iconFamily`: 아이콘 폰트 패밀리
 - `theme.font.iconSize`: 아이콘 폰트 크기
+- `theme.font.weight`: 폰트 굵기(QFont weight 숫자, 예: `400`, `500`, `600`, `700`)
 - `settings.example.json`: 초기 설정용 템플릿 파일
 
 ## i18n

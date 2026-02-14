@@ -5,6 +5,7 @@ import "."
 Item {
     id: root
     signal clicked
+    signal middleClicked
 
     implicitHeight: container.implicitHeight
     implicitWidth: container.implicitWidth
@@ -39,8 +40,15 @@ Item {
         MouseArea {
             anchors.fill: parent
             hoverEnabled: true
+            acceptedButtons: Qt.LeftButton | Qt.MiddleButton
             cursorShape: Qt.PointingHandCursor
-            onClicked: root.clicked()
+            onClicked: function(mouse) {
+                if (mouse.button === Qt.MiddleButton) {
+                    root.middleClicked()
+                    return
+                }
+                root.clicked()
+            }
         }
     }
 }

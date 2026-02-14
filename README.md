@@ -85,7 +85,8 @@ cp settings.example.json settings.json
       "family": "SF Pro Text",
       "size": 13,
       "iconFamily": "SauceCodePro Nerd Font",
-      "iconSize": 15
+      "iconSize": 15,
+      "weight": 600
     }
   }
 }
@@ -100,6 +101,7 @@ cp settings.example.json settings.json
 - `theme.font.size`: main UI font size
 - `theme.font.iconFamily`: icon font family
 - `theme.font.iconSize`: icon font size
+- `theme.font.weight`: font weight (QFont weight number, e.g. `400`, `500`, `600`, `700`)
 - `settings.example.json`: template file for initial setup
 
 ## i18n

@@ -19,7 +19,8 @@
       "family": "SF Pro Text",
       "size": 13,
       "iconFamily": "SauceCodePro Nerd Font",
-      "iconSize": 15
+      "iconSize": 15,
+      "weight": 600
     }
   }
 }

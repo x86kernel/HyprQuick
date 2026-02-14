@@ -79,6 +79,13 @@ ShellRoot {
             property string weatherUpdatedAt: SystemState.weatherUpdatedAt
             property string weatherError: SystemState.weatherError
             property double weatherLastFetchMs: SystemState.weatherLastFetchMs
+            property var cpuUsageIndicatorRef: null
+            property var bluetoothIndicatorRef: null
+            property var wifiIndicatorRef: null
+            property var volumeIndicatorRef: null
+            property var clipboardIndicatorRef: null
+            property var batteryIndicatorRef: null
+            property var dateTimeIndicatorRef: null
 
             ListModel {
                 id: toastModel
@@ -99,6 +106,7 @@ ShellRoot {
             function loadSettings() { SystemState.loadSettings() }
             function saveSettings() { SystemState.saveSettings() }
             function updateSetting(key, value) { SystemState.updateSetting(key, value) }
+            function replaceSettings(settingsObj) { SystemState.replaceSettings(settingsObj) }
             function normalizedMonthDate(d) { return SystemState.normalizedMonthDate(d) }
             function buildCalendarCells(referenceDate) { return SystemState.buildCalendarCells(referenceDate) }
             function rebuildCalendar() { SystemState.rebuildCalendar() }
@@ -181,37 +189,67 @@ ShellRoot {
                 }
             }
 
+            function defaultZoneLayout(zone) {
+                if (zone === "left") {
+                    return ["workspace", "focusedWindow", "media"]
+                }
+                if (zone === "center") {
+                    return ["vpn", "clock", "screenCapture"]
+                }
+                return ["systemTray", "volume", "clipboard", "cpu", "memory", "bluetooth", "wifi", "battery", "notifications"]
+            }
+
+            function zoneLayout(zone) {
+                var settings = appSettings && appSettings.bar && appSettings.bar.layout
+                    ? appSettings.bar.layout
+                    : null
+                if (!settings || !settings[zone] || settings[zone].length === undefined) {
+                    return defaultZoneLayout(zone)
+                }
+                return settings[zone]
+            }
+
+            function registerBlockRef(blockKey, item) {
+                if (blockKey === "cpu") cpuUsageIndicatorRef = item
+                else if (blockKey === "bluetooth") bluetoothIndicatorRef = item
+                else if (blockKey === "wifi") wifiIndicatorRef = item
+                else if (blockKey === "volume") volumeIndicatorRef = item
+                else if (blockKey === "clipboard") clipboardIndicatorRef = item
+                else if (blockKey === "battery") batteryIndicatorRef = item
+                else if (blockKey === "clock") dateTimeIndicatorRef = item
+            }
+
             function updateCpuPopupAnchor() {
-                if (!cpuUsageIndicator) {
+                if (!cpuUsageIndicatorRef) {
                     return
                 }
                 var anchorItem = bar.contentItem ? bar.contentItem : bar
-                var pos = cpuUsageIndicator.mapToItem(anchorItem, 0, cpuUsageIndicator.height)
-                cpuPopup.anchor.rect.x = pos.x + cpuUsageIndicator.width - Theme.cpuPopupWidth
+                var pos = cpuUsageIndicatorRef.mapToItem(anchorItem, 0, cpuUsageIndicatorRef.height)
+                cpuPopup.anchor.rect.x = pos.x + cpuUsageIndicatorRef.width - Theme.cpuPopupWidth
                 cpuPopup.anchor.rect.y = pos.y + Theme.cpuPopupOffset
                 cpuPopup.anchor.rect.width = 1
                 cpuPopup.anchor.rect.height = 1
             }
 
             function updateBluetoothPopupAnchor() {
-                if (!bluetoothIndicator) {
+                if (!bluetoothIndicatorRef) {
                     return
                 }
                 var anchorItem = bar.contentItem ? bar.contentItem : bar
-                var pos = bluetoothIndicator.mapToItem(anchorItem, 0, bluetoothIndicator.height)
-                bluetoothPopup.anchor.rect.x = pos.x + bluetoothIndicator.width - Theme.bluetoothPopupWidth
+                var pos = bluetoothIndicatorRef.mapToItem(anchorItem, 0, bluetoothIndicatorRef.height)
+                bluetoothPopup.anchor.rect.x = pos.x + bluetoothIndicatorRef.width - Theme.bluetoothPopupWidth
                 bluetoothPopup.anchor.rect.y = pos.y + Theme.bluetoothPopupOffset
                 bluetoothPopup.anchor.rect.width = 1
                 bluetoothPopup.anchor.rect.height = 1
             }
 
             function updateWifiPopupAnchor() {
-                if (!wifiIndicator) {
+                if (!wifiIndicatorRef) {
                     return
                 }
                 var anchorItem = bar.contentItem ? bar.contentItem : bar
-                var pos = wifiIndicator.mapToItem(anchorItem, 0, wifiIndicator.height)
-                wifiPopup.anchor.rect.x = pos.x + wifiIndicator.width - Theme.wifiPopupWidth
+                var pos = wifiIndicatorRef.mapToItem(anchorItem, 0, wifiIndicatorRef.height)
+                wifiPopup.anchor.rect.x = pos.x + wifiIndicatorRef.width - Theme.wifiPopupWidth
                     + Theme.wifiPopupAnchorOffsetX
                 wifiPopup.anchor.rect.y = pos.y + Theme.wifiPopupOffset + Theme.wifiPopupAnchorOffsetY
                 wifiPopup.anchor.rect.width = 1
@@ -219,24 +257,24 @@ ShellRoot {
             }
 
             function updateVolumePopupAnchor() {
-                if (!volumeIndicator || !volumePopup) {
+                if (!volumeIndicatorRef || !volumePopup) {
                     return
                 }
                 var anchorItem = bar.contentItem ? bar.contentItem : bar
-                var pos = volumeIndicator.mapToItem(anchorItem, 0, volumeIndicator.height)
-                volumePopup.anchor.rect.x = pos.x + volumeIndicator.width - Theme.volumePopupWidth
+                var pos = volumeIndicatorRef.mapToItem(anchorItem, 0, volumeIndicatorRef.height)
+                volumePopup.anchor.rect.x = pos.x + volumeIndicatorRef.width - Theme.volumePopupWidth
                 volumePopup.anchor.rect.y = pos.y + Theme.volumePopupOffset
                 volumePopup.anchor.rect.width = 1
                 volumePopup.anchor.rect.height = 1
             }
 
             function updateClipboardPopupAnchor() {
-                if (!clipboardIndicator || !clipboardPopup) {
+                if (!clipboardIndicatorRef || !clipboardPopup) {
                     return
                 }
                 var anchorItem = bar.contentItem ? bar.contentItem : bar
-                var pos = clipboardIndicator.mapToItem(anchorItem, 0, clipboardIndicator.height)
-                clipboardPopup.anchor.rect.x = pos.x + clipboardIndicator.width - Theme.clipboardPopupWidth
+                var pos = clipboardIndicatorRef.mapToItem(anchorItem, 0, clipboardIndicatorRef.height)
+                clipboardPopup.anchor.rect.x = pos.x + clipboardIndicatorRef.width - Theme.clipboardPopupWidth
                 clipboardPopup.anchor.rect.y = pos.y + Theme.clipboardPopupOffset
                 clipboardPopup.anchor.rect.width = 1
                 clipboardPopup.anchor.rect.height = 1
@@ -250,12 +288,12 @@ ShellRoot {
             }
 
             function updateBrightnessPopupAnchor() {
-                if (!batteryIndicator || !brightnessPopup) {
+                if (!batteryIndicatorRef || !brightnessPopup) {
                     return
                 }
                 var anchorItem = bar.contentItem ? bar.contentItem : bar
-                var pos = batteryIndicator.mapToItem(anchorItem, 0, batteryIndicator.height)
-                brightnessPopup.anchor.rect.x = pos.x + batteryIndicator.width - Theme.brightnessPopupWidth
+                var pos = batteryIndicatorRef.mapToItem(anchorItem, 0, batteryIndicatorRef.height)
+                brightnessPopup.anchor.rect.x = pos.x + batteryIndicatorRef.width - Theme.brightnessPopupWidth
                 brightnessPopup.anchor.rect.y = pos.y + Theme.brightnessPopupOffset
                 brightnessPopup.anchor.rect.width = 1
                 brightnessPopup.anchor.rect.height = 1
@@ -269,12 +307,12 @@ ShellRoot {
             }
 
             function updateDateWidgetPopupAnchor() {
-                if (!dateTimeIndicator) {
+                if (!dateTimeIndicatorRef) {
                     return
                 }
                 var anchorItem = bar.contentItem ? bar.contentItem : bar
-                var pos = dateTimeIndicator.mapToItem(anchorItem, 0, dateTimeIndicator.height)
-                var x = pos.x + (dateTimeIndicator.width - Theme.dateWidgetPopupWidth) / 2
+                var pos = dateTimeIndicatorRef.mapToItem(anchorItem, 0, dateTimeIndicatorRef.height)
+                var x = pos.x + (dateTimeIndicatorRef.width - Theme.dateWidgetPopupWidth) / 2
                 var minX = Theme.barMarginX
                 var maxX = Math.max(minX, bar.width - Theme.dateWidgetPopupWidth - Theme.barMarginX)
                 dateWidgetPopup.anchor.rect.x = Math.min(maxX, Math.max(minX, x))
@@ -436,6 +474,20 @@ ShellRoot {
                 dateWidgetPopup.open = true
             }
 
+            function toggleSettingsPanel() {
+                if (settingsPopup.open) {
+                    return
+                }
+                bluetoothPopup.open = false
+                wifiPopup.open = false
+                cpuPopup.open = false
+                clipboardPopup.open = false
+                notificationPopup.open = false
+                dateWidgetPopup.open = false
+                closeScreenshotPreview(true)
+                settingsPopup.open = true
+            }
+
             function clearTrackedNotifications() {
                 var source = []
                 if (!notificationServer.trackedNotifications) {
@@ -474,8 +526,8 @@ ShellRoot {
 
             HyprlandFocusGrab {
                 id: controllerFocusGrab
-                windows: [bar, cpuPopup, bluetoothPopup, wifiPopup, clipboardPopup, notificationPopup, dateWidgetPopup]
-                active: bluetoothPopup.open || wifiPopup.open || cpuPopup.open || clipboardPopup.open || notificationPopup.open || dateWidgetPopup.open
+                windows: [bar, cpuPopup, bluetoothPopup, wifiPopup, clipboardPopup, notificationPopup, dateWidgetPopup, settingsPopup]
+                active: bluetoothPopup.open || wifiPopup.open || cpuPopup.open || clipboardPopup.open || notificationPopup.open || dateWidgetPopup.open || settingsPopup.open
                 onCleared: bar.closeControllers()
             }
 
@@ -497,22 +549,23 @@ ShellRoot {
                         id: leftRow
                         spacing: Theme.blockGap
                         anchors.verticalCenter: parent.verticalCenter
-
-                        WorkspaceIndicator {
-                            id: workspaceIndicator
-                            monitor: bar.hyprMonitor
-                        }
-
-                        Loader {
-                            id: focusedWindowIndicatorLoader
-                            active: true
-                            sourceComponent: FocusedWindowIndicator {
-                                monitor: bar.hyprMonitor
+                        Repeater {
+                            model: bar.zoneLayout("left")
+                            delegate: Loader {
+                                property string blockKey: modelData
+                                sourceComponent: {
+                                    if (blockKey === "workspace") return workspaceIndicatorComp
+                                    if (blockKey === "focusedWindow") return focusedWindowIndicatorComp
+                                    if (blockKey === "media") return mediaIndicatorComp
+                                    return null
+                                }
+                                onLoaded: bar.registerBlockRef(blockKey, item)
+                                onItemChanged: {
+                                    if (!item) {
+                                        bar.registerBlockRef(blockKey, null)
+                                    }
+                                }
                             }
-                        }
-
-                        MediaIndicator {
-                            id: mediaIndicator
                         }
                     }
                 }
@@ -532,65 +585,29 @@ ShellRoot {
                         spacing: Theme.blockGap
                         anchors.verticalCenter: parent.verticalCenter
                         anchors.right: parent.right
-
-                        SystemTrayIndicator {
-                            id: systemTrayIndicator
-                            parentWindow: bar
-                        }
-
-                        VolumeIndicator {
-                            id: volumeIndicator
-                            onOsdRequested: function(volumePercent, muted, available) {
-                                bar.showVolumePopup(volumePercent, muted, available)
-                            }
-                        }
-
-                        ClipboardIndicator {
-                            id: clipboardIndicator
-                            onClicked: bar.toggleClipboardController()
-                            onRightClicked: {
-                                SystemState.wipeClipboardItems()
-                                clipboardPopup.open = false
-                            }
-                        }
-
-                        CPUUsageIndicator {
-                            id: cpuUsageIndicator
-                            parentWindow: bar
-                            onClicked: bar.toggleCpuController()
-                        }
-
-                        MemoryUsageIndicator {
-                            id: memoryUsageIndicator
-                        }
-
-                        BluetoothIndicator {
-                            id: bluetoothIndicator
-                            onClicked: bar.toggleBluetoothController()
-                        }
-
-                        WifiIndicator {
-                            id: wifiIndicator
-                            onClicked: bar.toggleWifiController()
-                        }
-
-                        BatteryIndicator {
-                            id: batteryIndicator
-                            onBrightnessOsdRequested: function(brightnessPercent, available) {
-                                bar.showBrightnessPopup(brightnessPercent, available)
-                            }
-                        }
-
-                        NotificationTrigger {
-                            id: notificationTrigger
-                            count: notificationCount()
-                            onClicked: bar.toggleNotificationCenter()
-                            onRightClicked: {
-                                if (notificationCount() > 0) {
-                                    bar.clearTrackedNotifications()
+                        Repeater {
+                            model: bar.zoneLayout("right")
+                            delegate: Loader {
+                                property string blockKey: modelData
+                                sourceComponent: {
+                                    if (blockKey === "systemTray") return systemTrayIndicatorComp
+                                    if (blockKey === "volume") return volumeIndicatorComp
+                                    if (blockKey === "clipboard") return clipboardIndicatorComp
+                                    if (blockKey === "cpu") return cpuUsageIndicatorComp
+                                    if (blockKey === "memory") return memoryUsageIndicatorComp
+                                    if (blockKey === "bluetooth") return bluetoothIndicatorComp
+                                    if (blockKey === "wifi") return wifiIndicatorComp
+                                    if (blockKey === "battery") return batteryIndicatorComp
+                                    if (blockKey === "notifications") return notificationTriggerComp
+                                    return null
+                                }
+                                onLoaded: bar.registerBlockRef(blockKey, item)
+                                onItemChanged: {
+                                    if (!item) {
+                                        bar.registerBlockRef(blockKey, null)
+                                    }
                                 }
                             }
-                            fixedWidth: bluetoothIndicator.implicitWidth
                         }
                     }
                 }
@@ -601,18 +618,40 @@ ShellRoot {
                 anchors.horizontalCenter: parent.horizontalCenter
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: Theme.blockGap
-
-                VpnIndicator {
-                    id: vpnIndicator
+                Repeater {
+                    model: bar.zoneLayout("center")
+                    delegate: Loader {
+                        property string blockKey: modelData
+                        sourceComponent: {
+                            if (blockKey === "vpn") return vpnIndicatorComp
+                            if (blockKey === "clock") return dateTimeIndicatorComp
+                            if (blockKey === "screenCapture") return screenCaptureIndicatorComp
+                            return null
+                        }
+                        onLoaded: bar.registerBlockRef(blockKey, item)
+                        onItemChanged: {
+                            if (!item) {
+                                bar.registerBlockRef(blockKey, null)
+                            }
+                        }
+                    }
                 }
+            }
 
+            Component { id: workspaceIndicatorComp; WorkspaceIndicator { monitor: bar.hyprMonitor } }
+            Component { id: focusedWindowIndicatorComp; FocusedWindowIndicator { monitor: bar.hyprMonitor } }
+            Component { id: mediaIndicatorComp; MediaIndicator {} }
+            Component { id: vpnIndicatorComp; VpnIndicator {} }
+            Component {
+                id: dateTimeIndicatorComp
                 DateTimeIndicator {
-                    id: dateTimeIndicator
                     onClicked: bar.toggleDateWidget()
+                    onMiddleClicked: bar.toggleSettingsPanel()
                 }
-
+            }
+            Component {
+                id: screenCaptureIndicatorComp
                 ScreenCaptureIndicator {
-                    id: screenCaptureIndicator
                     parentWindow: bar
                     onCaptureCompleted: function(filePath) {
                         bar.openScreenshotPreview(filePath)
@@ -650,6 +689,66 @@ ShellRoot {
                     }
                 }
             }
+            Component { id: systemTrayIndicatorComp; SystemTrayIndicator { parentWindow: bar } }
+            Component {
+                id: volumeIndicatorComp
+                VolumeIndicator {
+                    onOsdRequested: function(volumePercent, muted, available) {
+                        bar.showVolumePopup(volumePercent, muted, available)
+                    }
+                }
+            }
+            Component {
+                id: clipboardIndicatorComp
+                ClipboardIndicator {
+                    onClicked: bar.toggleClipboardController()
+                    onRightClicked: {
+                        SystemState.wipeClipboardItems()
+                        clipboardPopup.open = false
+                    }
+                }
+            }
+            Component { id: memoryUsageIndicatorComp; MemoryUsageIndicator {} }
+            Component {
+                id: cpuUsageIndicatorComp
+                CPUUsageIndicator {
+                    parentWindow: bar
+                    onClicked: bar.toggleCpuController()
+                }
+            }
+            Component {
+                id: bluetoothIndicatorComp
+                BluetoothIndicator {
+                    onClicked: bar.toggleBluetoothController()
+                }
+            }
+            Component {
+                id: wifiIndicatorComp
+                WifiIndicator {
+                    onClicked: bar.toggleWifiController()
+                }
+            }
+            Component {
+                id: batteryIndicatorComp
+                BatteryIndicator {
+                    onBrightnessOsdRequested: function(brightnessPercent, available) {
+                        bar.showBrightnessPopup(brightnessPercent, available)
+                    }
+                }
+            }
+            Component {
+                id: notificationTriggerComp
+                NotificationTrigger {
+                    count: notificationCount()
+                    fixedWidth: bar.bluetoothIndicatorRef ? bar.bluetoothIndicatorRef.implicitWidth : 0
+                    onClicked: bar.toggleNotificationCenter()
+                    onRightClicked: {
+                        if (notificationCount() > 0) {
+                            bar.clearTrackedNotifications()
+                        }
+                    }
+                }
+            }
 
             Component {
                 id: iconImageComp
@@ -682,11 +781,11 @@ ShellRoot {
             CpuPopup {
                 id: cpuPopup
                 bar: bar
-                cpuUsageIndicator: cpuUsageIndicator
+                cpuUsageIndicator: bar.cpuUsageIndicatorRef
             }
 
             Connections {
-                target: cpuUsageIndicator
+                target: bar.cpuUsageIndicatorRef
                 function onWidthChanged() { bar.updateCpuPopupAnchor() }
                 function onHeightChanged() { bar.updateCpuPopupAnchor() }
             }
@@ -699,11 +798,11 @@ ShellRoot {
             BluetoothPopup {
                 id: bluetoothPopup
                 bar: bar
-                bluetoothIndicator: bluetoothIndicator
+                bluetoothIndicator: bar.bluetoothIndicatorRef
             }
 
             Connections {
-                target: bluetoothIndicator
+                target: bar.bluetoothIndicatorRef
                 function onDeviceItemsChanged() { bar.updateBluetoothPopupAnchor() }
                 function onWidthChanged() { bar.updateBluetoothPopupAnchor() }
                 function onHeightChanged() { bar.updateBluetoothPopupAnchor() }
@@ -717,7 +816,7 @@ ShellRoot {
             WifiPopup {
                 id: wifiPopup
                 bar: bar
-                wifiIndicator: wifiIndicator
+                wifiIndicator: bar.wifiIndicatorRef
             }
 
             VolumePopup {
@@ -728,7 +827,7 @@ ShellRoot {
             ClipboardPopup {
                 id: clipboardPopup
                 bar: bar
-                clipboardIndicator: clipboardIndicator
+                clipboardIndicator: bar.clipboardIndicatorRef
             }
 
             BrightnessPopup {
@@ -737,7 +836,7 @@ ShellRoot {
             }
 
             Connections {
-                target: wifiIndicator
+                target: bar.wifiIndicatorRef
                 function onNetworksChanged() { bar.updateWifiPopupAnchor() }
                 function onWidthChanged() { bar.updateWifiPopupAnchor() }
                 function onHeightChanged() { bar.updateWifiPopupAnchor() }
@@ -780,7 +879,7 @@ ShellRoot {
             }
 
             Connections {
-                target: dateTimeIndicator
+                target: bar.dateTimeIndicatorRef
                 function onWidthChanged() { bar.updateDateWidgetPopupAnchor() }
                 function onHeightChanged() { bar.updateDateWidgetPopupAnchor() }
             }
@@ -791,25 +890,30 @@ ShellRoot {
             }
 
             Connections {
-                target: volumeIndicator
+                target: bar.volumeIndicatorRef
                 function onWidthChanged() { bar.updateVolumePopupAnchor() }
                 function onHeightChanged() { bar.updateVolumePopupAnchor() }
             }
 
             Connections {
-                target: clipboardIndicator
+                target: bar.clipboardIndicatorRef
                 function onWidthChanged() { bar.updateClipboardPopupAnchor() }
                 function onHeightChanged() { bar.updateClipboardPopupAnchor() }
             }
 
             Connections {
-                target: batteryIndicator
+                target: bar.batteryIndicatorRef
                 function onWidthChanged() { bar.updateBrightnessPopupAnchor() }
                 function onHeightChanged() { bar.updateBrightnessPopupAnchor() }
             }
 
             DateWidgetPopup {
                 id: dateWidgetPopup
+                bar: bar
+            }
+
+            SettingsPopup {
+                id: settingsPopup
                 bar: bar
             }
 
@@ -836,6 +940,13 @@ ShellRoot {
             Connections {
                 target: brightnessPopup
                 function onOpenChanged() { bar.enforcePopupNoKeyboardFocus(brightnessPopup) }
+            }
+
+            Connections {
+                target: settingsPopup
+                function onOpenChanged() {
+                    bar.enforcePopupNoKeyboardFocus(settingsPopup)
+                }
             }
 
             MouseArea {
