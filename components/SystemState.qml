@@ -986,9 +986,13 @@ Singleton {
         var customPalette = theme.customPalette || []
         var bar = next.bar || {}
         var layout = bar.layout || {}
-        var allowedLeft = { workspace: true, focusedWindow: true, media: true }
-        var allowedCenter = { vpn: true, clock: true, screenCapture: true }
-        var allowedRight = {
+        var allowedBlocks = {
+            workspace: true,
+            focusedWindow: true,
+            media: true,
+            vpn: true,
+            clock: true,
+            screenCapture: true,
             systemTray: true,
             volume: true,
             clipboard: true,
@@ -1005,24 +1009,28 @@ Singleton {
             return text.length > 0 ? text : String(fallback)
         }
 
-        function normalizeZoneLayout(inputList, allowedMap, fallbackList) {
+        function normalizeZoneLayout(inputList, allowedMap, fallbackList, globalSeen) {
             var source = inputList
             if (!source || source.length === undefined) {
                 source = fallbackList
             }
             var out = []
-            var seen = {}
             for (var i = 0; i < source.length; i += 1) {
                 var key = String(source[i] || "")
-                if (!allowedMap[key] || seen[key]) {
+                if (!allowedMap[key] || globalSeen[key]) {
                     continue
                 }
-                seen[key] = true
+                globalSeen[key] = true
                 out.push(key)
             }
             if (out.length === 0) {
                 for (var j = 0; j < fallbackList.length; j += 1) {
-                    out.push(fallbackList[j])
+                    var fallbackKey = String(fallbackList[j] || "")
+                    if (!allowedMap[fallbackKey] || globalSeen[fallbackKey]) {
+                        continue
+                    }
+                    globalSeen[fallbackKey] = true
+                    out.push(fallbackKey)
                 }
             }
             return out
@@ -1062,6 +1070,11 @@ Singleton {
             return out
         }
 
+        var zoneSeen = {}
+        var normalizedLeft = normalizeZoneLayout(layout.left, allowedBlocks, defaults.bar.layout.left, zoneSeen)
+        var normalizedCenter = normalizeZoneLayout(layout.center, allowedBlocks, defaults.bar.layout.center, zoneSeen)
+        var normalizedRight = normalizeZoneLayout(layout.right, allowedBlocks, defaults.bar.layout.right, zoneSeen)
+
         return {
             general: {
                 locale: I18n.normalizeLocale(general.locale !== undefined ? general.locale : (next.locale !== undefined ? next.locale : defaults.general.locale))
@@ -1099,9 +1112,9 @@ Singleton {
             },
             bar: {
                 layout: {
-                    left: normalizeZoneLayout(layout.left, allowedLeft, defaults.bar.layout.left),
-                    center: normalizeZoneLayout(layout.center, allowedCenter, defaults.bar.layout.center),
-                    right: normalizeZoneLayout(layout.right, allowedRight, defaults.bar.layout.right)
+                    left: normalizedLeft,
+                    center: normalizedCenter,
+                    right: normalizedRight
                 }
             }
         }

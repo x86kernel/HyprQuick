@@ -219,6 +219,25 @@ ShellRoot {
                 else if (blockKey === "clock") dateTimeIndicatorRef = item
             }
 
+            function componentForBlock(blockKey) {
+                if (blockKey === "workspace") return workspaceIndicatorComp
+                if (blockKey === "focusedWindow") return focusedWindowIndicatorComp
+                if (blockKey === "media") return mediaIndicatorComp
+                if (blockKey === "vpn") return vpnIndicatorComp
+                if (blockKey === "clock") return dateTimeIndicatorComp
+                if (blockKey === "screenCapture") return screenCaptureIndicatorComp
+                if (blockKey === "systemTray") return systemTrayIndicatorComp
+                if (blockKey === "volume") return volumeIndicatorComp
+                if (blockKey === "clipboard") return clipboardIndicatorComp
+                if (blockKey === "cpu") return cpuUsageIndicatorComp
+                if (blockKey === "memory") return memoryUsageIndicatorComp
+                if (blockKey === "bluetooth") return bluetoothIndicatorComp
+                if (blockKey === "wifi") return wifiIndicatorComp
+                if (blockKey === "battery") return batteryIndicatorComp
+                if (blockKey === "notifications") return notificationTriggerComp
+                return null
+            }
+
             function updateCpuPopupAnchor() {
                 if (!cpuUsageIndicatorRef) {
                     return
@@ -553,12 +572,7 @@ ShellRoot {
                             model: bar.zoneLayout("left")
                             delegate: Loader {
                                 property string blockKey: modelData
-                                sourceComponent: {
-                                    if (blockKey === "workspace") return workspaceIndicatorComp
-                                    if (blockKey === "focusedWindow") return focusedWindowIndicatorComp
-                                    if (blockKey === "media") return mediaIndicatorComp
-                                    return null
-                                }
+                                sourceComponent: bar.componentForBlock(blockKey)
                                 onLoaded: bar.registerBlockRef(blockKey, item)
                                 onItemChanged: {
                                     if (!item) {
@@ -589,18 +603,7 @@ ShellRoot {
                             model: bar.zoneLayout("right")
                             delegate: Loader {
                                 property string blockKey: modelData
-                                sourceComponent: {
-                                    if (blockKey === "systemTray") return systemTrayIndicatorComp
-                                    if (blockKey === "volume") return volumeIndicatorComp
-                                    if (blockKey === "clipboard") return clipboardIndicatorComp
-                                    if (blockKey === "cpu") return cpuUsageIndicatorComp
-                                    if (blockKey === "memory") return memoryUsageIndicatorComp
-                                    if (blockKey === "bluetooth") return bluetoothIndicatorComp
-                                    if (blockKey === "wifi") return wifiIndicatorComp
-                                    if (blockKey === "battery") return batteryIndicatorComp
-                                    if (blockKey === "notifications") return notificationTriggerComp
-                                    return null
-                                }
+                                sourceComponent: bar.componentForBlock(blockKey)
                                 onLoaded: bar.registerBlockRef(blockKey, item)
                                 onItemChanged: {
                                     if (!item) {
@@ -622,12 +625,7 @@ ShellRoot {
                     model: bar.zoneLayout("center")
                     delegate: Loader {
                         property string blockKey: modelData
-                        sourceComponent: {
-                            if (blockKey === "vpn") return vpnIndicatorComp
-                            if (blockKey === "clock") return dateTimeIndicatorComp
-                            if (blockKey === "screenCapture") return screenCaptureIndicatorComp
-                            return null
-                        }
+                        sourceComponent: bar.componentForBlock(blockKey)
                         onLoaded: bar.registerBlockRef(blockKey, item)
                         onItemChanged: {
                             if (!item) {

@@ -11,29 +11,23 @@ PanelWindow {
     property bool saveNoticeOpen: false
     property var draftSettings: ({})
 
-    property var zoneDefinitions: ({
-        left: [
-            { key: "workspace", label: "Workspace" },
-            { key: "focusedWindow", label: "Focused Window" },
-            { key: "media", label: "Media" }
-        ],
-        center: [
-            { key: "vpn", label: "VPN" },
-            { key: "clock", label: "Clock" },
-            { key: "screenCapture", label: "Capture/Record" }
-        ],
-        right: [
-            { key: "systemTray", label: "System Tray" },
-            { key: "volume", label: "Volume" },
-            { key: "clipboard", label: "Clipboard" },
-            { key: "cpu", label: "CPU" },
-            { key: "memory", label: "Memory" },
-            { key: "bluetooth", label: "Bluetooth" },
-            { key: "wifi", label: "WiFi" },
-            { key: "battery", label: "Battery" },
-            { key: "notifications", label: "Notifications" }
-        ]
-    })
+    property var blockDefinitions: [
+        { key: "workspace", label: "Workspace" },
+        { key: "focusedWindow", label: "Focused Window" },
+        { key: "media", label: "Media" },
+        { key: "vpn", label: "VPN" },
+        { key: "clock", label: "Clock" },
+        { key: "screenCapture", label: "Capture/Record" },
+        { key: "systemTray", label: "System Tray" },
+        { key: "volume", label: "Volume" },
+        { key: "clipboard", label: "Clipboard" },
+        { key: "cpu", label: "CPU" },
+        { key: "memory", label: "Memory" },
+        { key: "bluetooth", label: "Bluetooth" },
+        { key: "wifi", label: "WiFi" },
+        { key: "battery", label: "Battery" },
+        { key: "notifications", label: "Notifications" }
+    ]
 
     property var targetScreen: bar ? bar.screen : null
 
@@ -69,11 +63,10 @@ PanelWindow {
         }
     }
 
-    function labelFor(zone, key) {
-        var defs = zoneDefinitions[zone] || []
-        for (var i = 0; i < defs.length; i += 1) {
-            if (defs[i].key === key) {
-                return defs[i].label
+    function labelFor(key) {
+        for (var i = 0; i < blockDefinitions.length; i += 1) {
+            if (blockDefinitions[i].key === key) {
+                return blockDefinitions[i].label
             }
         }
         return key
@@ -108,13 +101,14 @@ PanelWindow {
     }
 
     function rebuildUnusedForZone(zone) {
-        var defs = zoneDefinitions[zone] || []
-        var used = zoneUsedModel(zone)
+        var usedLeft = zoneUsedModel("left")
+        var usedCenter = zoneUsedModel("center")
+        var usedRight = zoneUsedModel("right")
         var unused = zoneUnusedModel(zone)
         unused.clear()
-        for (var i = 0; i < defs.length; i += 1) {
-            var key = defs[i].key
-            if (!modelHasKey(used, key)) {
+        for (var i = 0; i < blockDefinitions.length; i += 1) {
+            var key = blockDefinitions[i].key
+            if (!modelHasKey(usedLeft, key) && !modelHasKey(usedCenter, key) && !modelHasKey(usedRight, key)) {
                 unused.append({ key: key })
             }
         }
@@ -154,15 +148,29 @@ PanelWindow {
         rebuildAllUnused()
     }
 
-    function toggleZoneBlock(zone, key) {
-        var used = zoneUsedModel(zone)
-        for (var i = 0; i < used.count; i += 1) {
-            if (used.get(i).key === key) {
-                used.remove(i)
-                syncDraftFromUsedModels()
-                return
+    function removeFromModel(model, key) {
+        for (var i = 0; i < model.count; i += 1) {
+            if (model.get(i).key === key) {
+                model.remove(i)
+                return true
             }
         }
+        return false
+    }
+
+    function removeKeyFromAllUsed(key) {
+        removeFromModel(leftUsedModel, key)
+        removeFromModel(centerUsedModel, key)
+        removeFromModel(rightUsedModel, key)
+    }
+
+    function toggleZoneBlock(zone, key) {
+        var used = zoneUsedModel(zone)
+        if (removeFromModel(used, key)) {
+            syncDraftFromUsedModels()
+            return
+        }
+        removeKeyFromAllUsed(key)
         used.append({ key: key })
         syncDraftFromUsedModels()
     }
@@ -405,7 +413,7 @@ PanelWindow {
                                         id: labelText
                                         anchors.fill: parent
                                         anchors.margins: 6
-                                        text: root.labelFor(zone, blockKey)
+                                        text: root.labelFor(blockKey)
                                         color: Theme.textOnAccent
                                         font.family: Theme.fontFamily
                                         font.pixelSize: Theme.fontSizeSmall
@@ -504,7 +512,7 @@ PanelWindow {
                                         Text {
                                             id: chipLabel
                                             anchors.centerIn: parent
-                                            text: root.labelFor(zone, blockKey)
+                                            text: root.labelFor(blockKey)
                                             color: Theme.textOnAccent
                                             font.family: Theme.fontFamily
                                             font.pixelSize: Theme.fontSizeSmall
