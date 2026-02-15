@@ -940,13 +940,6 @@ ShellRoot {
                 function onOpenChanged() { bar.enforcePopupNoKeyboardFocus(brightnessPopup) }
             }
 
-            Connections {
-                target: settingsPopup
-                function onOpenChanged() {
-                    bar.enforcePopupNoKeyboardFocus(settingsPopup)
-                }
-            }
-
             MouseArea {
                 anchors.fill: parent
                 z: -1

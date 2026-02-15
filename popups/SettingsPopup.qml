@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell
+import Quickshell.Io
 import "../components"
 
 PanelWindow {
@@ -9,7 +10,13 @@ PanelWindow {
     property real anim: open ? 1 : 0
     property bool resetConfirmOpen: false
     property bool saveNoticeOpen: false
+    property string activeTab: "general"
     property var draftSettings: ({})
+    property bool saveValidationRunning: false
+    property string saveValidationError: ""
+    property bool pendingWeatherValidation: false
+    property bool pendingHolidayValidation: false
+    property var pendingSaveSettings: ({})
 
     property var blockDefinitions: [
         { key: "workspace", label: "Workspace" },
@@ -61,6 +68,37 @@ PanelWindow {
         } catch (e) {
             return {}
         }
+    }
+
+    function draftGet(path, fallbackValue) {
+        var parts = String(path || "").split(".")
+        var cur = draftSettings
+        for (var i = 0; i < parts.length; i += 1) {
+            if (!cur || cur[parts[i]] === undefined) {
+                return fallbackValue
+            }
+            cur = cur[parts[i]]
+        }
+        return cur
+    }
+
+    function draftSet(path, value) {
+        saveValidationError = ""
+        var next = deepCopy(draftSettings)
+        var parts = String(path || "").split(".")
+        if (parts.length === 0) {
+            return
+        }
+        var cursor = next
+        for (var i = 0; i < parts.length - 1; i += 1) {
+            if (!cursor[parts[i]] || typeof cursor[parts[i]] !== "object") {
+                cursor[parts[i]] = {}
+            }
+            cursor = cursor[parts[i]]
+        }
+        cursor[parts[parts.length - 1]] = value
+        draftSettings = bar.normalizedSettings(next)
+        syncZoneModelsFromDraft()
     }
 
     function labelFor(key) {
@@ -203,13 +241,160 @@ PanelWindow {
         resetConfirmOpen = false
     }
 
-    function saveSettings() {
+    function weatherLangForLocale(localeCode) {
+        var normalized = String(localeCode || "en-US").trim().toLowerCase()
+        if (normalized.indexOf("ko") === 0) return "ko"
+        if (normalized.indexOf("ja") === 0) return "ja"
+        if (normalized.indexOf("zh") === 0) return "zh"
+        return "en"
+    }
+
+    function buildWeatherValidationCommand(settings) {
+        var weather = (settings && settings.integrations && settings.integrations.weather) ? settings.integrations.weather : {}
+        var general = (settings && settings.general) ? settings.general : {}
+        var apiKey = String(weather.apiKey || "").trim()
+        if (apiKey.length === 0) {
+            return "printf '__QSERR__ missing:weatherapi-key\\n'"
+        }
+        var location = String(weather.location || "").trim()
+        if (location.length === 0) {
+            location = "auto:ip"
+        }
+        var weatherLang = weatherLangForLocale(general.locale || "en-US")
+        var url = "https://api.weatherapi.com/v1/current.json?key="
+            + encodeURIComponent(apiKey)
+            + "&q=" + encodeURIComponent(location)
+            + "&lang=" + encodeURIComponent(weatherLang)
+            + "&aqi=no"
+        return "if command -v curl >/dev/null 2>&1; then curl -sS --max-time 8 '" + url + "'; " +
+            "elif command -v wget >/dev/null 2>&1; then wget -qO- '" + url + "'; " +
+            "else printf '__QSERR__ missing:curl-or-wget\\n'; fi"
+    }
+
+    function buildHolidayValidationCommand(settings) {
+        var holidays = (settings && settings.integrations && settings.integrations.holidays) ? settings.integrations.holidays : {}
+        var countryCode = String(holidays.countryCode || "KR").trim().toUpperCase()
+        if (countryCode.length === 0) {
+            countryCode = "KR"
+        }
+        var year = new Date().getFullYear()
+        var url = "https://date.nager.at/api/v3/PublicHolidays/" + String(year) + "/" + countryCode
+        return "if command -v curl >/dev/null 2>&1; then curl -sS --max-time 8 '" + url + "'; " +
+            "elif command -v wget >/dev/null 2>&1; then wget -qO- '" + url + "'; " +
+            "else printf '__QSERR__ missing:curl-or-wget\\n'; fi"
+    }
+
+    function parseWeatherValidationError(rawText) {
+        var text = String(rawText || "").trim()
+        if (text.length === 0) {
+            return "Weather validation failed: empty response."
+        }
+        if (text.indexOf("__QSERR__") === 0) {
+            return "Weather validation failed: " + text.replace("__QSERR__", "").trim()
+        }
+        var payload = null
+        try {
+            payload = JSON.parse(text)
+        } catch (e) {
+            return "Weather validation failed: invalid response."
+        }
+        if (!payload || typeof payload !== "object") {
+            return "Weather validation failed: invalid payload."
+        }
+        if (payload.error) {
+            return "Weather validation failed: " + String(payload.error.message || "unknown error")
+        }
+        if (!payload.location || !payload.current) {
+            return "Weather validation failed: incomplete payload."
+        }
+        return ""
+    }
+
+    function parseHolidayValidationError(rawText) {
+        var text = String(rawText || "").trim()
+        if (text.length === 0) {
+            return "Holiday validation failed: empty response."
+        }
+        if (text.indexOf("__QSERR__") === 0) {
+            return "Holiday validation failed: " + text.replace("__QSERR__", "").trim()
+        }
+        var payload = null
+        try {
+            payload = JSON.parse(text)
+        } catch (e) {
+            return "Holiday validation failed: invalid response."
+        }
+        if (Array.isArray(payload)) {
+            return ""
+        }
+        if (payload && payload.message) {
+            return "Holiday validation failed: " + String(payload.message)
+        }
+        return "Holiday validation failed: invalid country code or API response."
+    }
+
+    function syncGeneralInputsToDraft() {
+        draftSet("integrations.weather.apiKey", weatherApiInput.text)
+        draftSet("integrations.weather.location", weatherLocationInput.text)
+        draftSet("integrations.holidays.countryCode", holidayCodeInput.text)
+    }
+
+    function finishSave() {
         if (!bar) {
             return
         }
-        bar.replaceSettings(draftSettings)
+        bar.replaceSettings(pendingSaveSettings)
         saveNoticeOpen = true
         saveNoticeTimer.restart()
+        saveValidationRunning = false
+    }
+
+    function runNextValidation() {
+        if (pendingWeatherValidation) {
+            pendingWeatherValidation = false
+            weatherValidationProc.command = ["sh", "-c", buildWeatherValidationCommand(pendingSaveSettings)]
+            weatherValidationProc.running = true
+            return
+        }
+        if (pendingHolidayValidation) {
+            pendingHolidayValidation = false
+            holidayValidationProc.command = ["sh", "-c", buildHolidayValidationCommand(pendingSaveSettings)]
+            holidayValidationProc.running = true
+            return
+        }
+        finishSave()
+    }
+
+    function saveSettings() {
+        if (!bar || saveValidationRunning) {
+            return
+        }
+        syncGeneralInputsToDraft()
+        var current = bar.normalizedSettings(bar.appSettings || bar.defaultSettings())
+        var next = bar.normalizedSettings(draftSettings || {})
+        pendingSaveSettings = next
+        saveValidationError = ""
+
+        var currentWeather = (current.integrations && current.integrations.weather) ? current.integrations.weather : {}
+        var nextWeather = (next.integrations && next.integrations.weather) ? next.integrations.weather : {}
+        var currentHolidays = (current.integrations && current.integrations.holidays) ? current.integrations.holidays : {}
+        var nextHolidays = (next.integrations && next.integrations.holidays) ? next.integrations.holidays : {}
+
+        var weatherChanged = String(nextWeather.apiKey || "") !== String(currentWeather.apiKey || "")
+            || String(nextWeather.location || "") !== String(currentWeather.location || "")
+        pendingWeatherValidation = weatherChanged && String(nextWeather.apiKey || "").trim().length > 0
+
+        var nextHolidayCode = String(nextHolidays.countryCode || "KR").trim().toUpperCase()
+        var currentHolidayCode = String(currentHolidays.countryCode || "KR").trim().toUpperCase()
+        pendingHolidayValidation = nextHolidayCode !== currentHolidayCode
+
+        if (!pendingWeatherValidation && !pendingHolidayValidation) {
+            finishSave()
+            return
+        }
+
+        saveValidationRunning = true
+        runNextValidation()
     }
 
     onOpenChanged: {
@@ -218,6 +403,8 @@ PanelWindow {
         } else {
             resetConfirmOpen = false
             saveNoticeOpen = false
+            saveValidationRunning = false
+            saveValidationError = ""
         }
     }
 
@@ -227,6 +414,46 @@ PanelWindow {
         running: false
         repeat: false
         onTriggered: root.saveNoticeOpen = false
+    }
+
+    Process {
+        id: weatherValidationProc
+        command: ["sh", "-c", "true"]
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished: {
+                if (!root.saveValidationRunning) {
+                    return
+                }
+                var err = root.parseWeatherValidationError(this.text)
+                if (err.length > 0) {
+                    root.saveValidationRunning = false
+                    root.saveValidationError = err
+                    return
+                }
+                root.runNextValidation()
+            }
+        }
+    }
+
+    Process {
+        id: holidayValidationProc
+        command: ["sh", "-c", "true"]
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished: {
+                if (!root.saveValidationRunning) {
+                    return
+                }
+                var err = root.parseHolidayValidationError(this.text)
+                if (err.length > 0) {
+                    root.saveValidationRunning = false
+                    root.saveValidationError = err
+                    return
+                }
+                root.runNextValidation()
+            }
+        }
     }
 
     Rectangle {
@@ -246,11 +473,66 @@ PanelWindow {
             anchors.leftMargin: 14
             anchors.rightMargin: 14
             anchors.topMargin: 12
-            text: "Block Layout Settings"
+            text: "Settings"
             color: Theme.accent
             font.family: Theme.fontFamily
             font.pixelSize: Theme.controllerFontSize
             font.weight: Theme.fontWeight
+        }
+
+        Row {
+            id: tabRow
+            anchors.left: parent.left
+            anchors.top: titleText.bottom
+            anchors.leftMargin: 14
+            anchors.topMargin: 8
+            spacing: 8
+
+            Rectangle {
+                width: 86
+                height: 30
+                radius: 8
+                color: root.activeTab === "general" ? Theme.accent : Theme.blockBg
+                border.width: 1
+                border.color: Theme.blockBorder
+                Text {
+                    anchors.centerIn: parent
+                    text: "일반"
+                    color: root.activeTab === "general" ? Theme.textOnAccent : Theme.textPrimary
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSizeSmall
+                    font.weight: Theme.fontWeight
+                }
+                MouseArea {
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.activeTab = "general"
+                }
+            }
+
+            Rectangle {
+                width: 86
+                height: 30
+                radius: 8
+                color: root.activeTab === "blocks" ? Theme.accent : Theme.blockBg
+                border.width: 1
+                border.color: Theme.blockBorder
+                Text {
+                    anchors.centerIn: parent
+                    text: "블록"
+                    color: root.activeTab === "blocks" ? Theme.textOnAccent : Theme.textPrimary
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSizeSmall
+                    font.weight: Theme.fontWeight
+                }
+                MouseArea {
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.activeTab = "blocks"
+                }
+            }
         }
 
         Row {
@@ -312,7 +594,7 @@ PanelWindow {
                 color: Theme.accent
                 Text {
                     anchors.centerIn: parent
-                    text: "Save"
+                    text: root.saveValidationRunning ? "Validating..." : "Save"
                     color: Theme.textOnAccent
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.fontSize
@@ -321,17 +603,32 @@ PanelWindow {
                 MouseArea {
                     anchors.fill: parent
                     hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
+                    cursorShape: root.saveValidationRunning ? Qt.ArrowCursor : Qt.PointingHandCursor
                     onClicked: root.saveSettings()
                 }
             }
+        }
+
+        Text {
+            visible: root.saveValidationError.length > 0
+            anchors.left: parent.left
+            anchors.right: actionRow.left
+            anchors.bottom: actionRow.bottom
+            anchors.leftMargin: 14
+            anchors.rightMargin: 10
+            text: root.saveValidationError
+            color: "#ff8fa3"
+            elide: Text.ElideRight
+            font.family: Theme.fontFamily
+            font.pixelSize: Theme.fontSizeSmall
+            font.weight: Theme.fontWeight
         }
 
         Flickable {
             id: scroll
             anchors.left: parent.left
             anchors.right: parent.right
-            anchors.top: titleText.bottom
+            anchors.top: tabRow.bottom
             anchors.bottom: actionRow.top
             anchors.leftMargin: 14
             anchors.rightMargin: 14
@@ -346,8 +643,171 @@ PanelWindow {
                 width: scroll.width
                 spacing: 12
 
+                Rectangle {
+                    visible: root.activeTab === "general"
+                    width: parent.width
+                    radius: Theme.blockRadius
+                    color: Theme.blockBg
+                    border.width: 1
+                    border.color: Theme.blockBorder
+                    implicitHeight: generalColumn.implicitHeight + 14
+
+                    Column {
+                        id: generalColumn
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.top: parent.top
+                        anchors.margins: 7
+                        spacing: 10
+
+                        Text {
+                            text: "General"
+                            color: Theme.textPrimary
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSize
+                            font.weight: Theme.fontWeight
+                        }
+
+                        Text {
+                            text: "Locale"
+                            color: Theme.textPrimary
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSizeSmall
+                            font.weight: Theme.fontWeight
+                        }
+
+                        Row {
+                            spacing: 6
+                            Repeater {
+                                model: ["ko-KR", "en-US"]
+                                delegate: Rectangle {
+                                    width: 76
+                                    height: 28
+                                    radius: 7
+                                    color: String(root.draftGet("general.locale", "ko-KR")) === modelData ? Theme.accent : Theme.accentAlt
+                                    border.width: 1
+                                    border.color: Theme.blockBorder
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: modelData
+                                        color: Theme.textOnAccent
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontSizeSmall
+                                        font.weight: Theme.fontWeight
+                                    }
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: root.draftSet("general.locale", modelData)
+                                    }
+                                }
+                            }
+                        }
+
+                        Text {
+                            text: "Weather API Key"
+                            color: Theme.textPrimary
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSizeSmall
+                            font.weight: Theme.fontWeight
+                        }
+
+                        Rectangle {
+                            width: generalColumn.width
+                            height: 34
+                            radius: 8
+                            color: "#1f2133"
+                            border.width: 1
+                            border.color: weatherApiInput.activeFocus ? "#8c79b3" : "#3a3f63"
+                            HoverHandler { cursorShape: Qt.IBeamCursor }
+                            TextInput {
+                                id: weatherApiInput
+                                anchors.fill: parent
+                                anchors.leftMargin: 10
+                                anchors.rightMargin: 10
+                                text: String(root.draftGet("integrations.weather.apiKey", ""))
+                                color: Theme.textPrimary
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeSmall
+                                font.weight: Theme.fontWeight
+                                selectionColor: "#8c79b355"
+                                selectedTextColor: Theme.textOnAccent
+                                verticalAlignment: TextInput.AlignVCenter
+                                onTextEdited: root.draftSet("integrations.weather.apiKey", text)
+                            }
+                        }
+
+                        Text {
+                            text: "Weather Location"
+                            color: Theme.textPrimary
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSizeSmall
+                            font.weight: Theme.fontWeight
+                        }
+
+                        Rectangle {
+                            width: generalColumn.width
+                            height: 34
+                            radius: 8
+                            color: "#1f2133"
+                            border.width: 1
+                            border.color: weatherLocationInput.activeFocus ? "#8c79b3" : "#3a3f63"
+                            HoverHandler { cursorShape: Qt.IBeamCursor }
+                            TextInput {
+                                id: weatherLocationInput
+                                anchors.fill: parent
+                                anchors.leftMargin: 10
+                                anchors.rightMargin: 10
+                                text: String(root.draftGet("integrations.weather.location", "auto:ip"))
+                                color: Theme.textPrimary
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeSmall
+                                font.weight: Theme.fontWeight
+                                selectionColor: "#8c79b355"
+                                selectedTextColor: Theme.textOnAccent
+                                verticalAlignment: TextInput.AlignVCenter
+                                onTextEdited: root.draftSet("integrations.weather.location", text)
+                            }
+                        }
+
+                        Text {
+                            text: "Holiday Country Code"
+                            color: Theme.textPrimary
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSizeSmall
+                            font.weight: Theme.fontWeight
+                        }
+
+                        Rectangle {
+                            width: generalColumn.width
+                            height: 34
+                            radius: 8
+                            color: "#1f2133"
+                            border.width: 1
+                            border.color: holidayCodeInput.activeFocus ? "#8c79b3" : "#3a3f63"
+                            HoverHandler { cursorShape: Qt.IBeamCursor }
+                            TextInput {
+                                id: holidayCodeInput
+                                anchors.fill: parent
+                                anchors.leftMargin: 10
+                                anchors.rightMargin: 10
+                                text: String(root.draftGet("integrations.holidays.countryCode", "KR"))
+                                color: Theme.textPrimary
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeSmall
+                                font.weight: Theme.fontWeight
+                                selectionColor: "#8c79b355"
+                                selectedTextColor: Theme.textOnAccent
+                                verticalAlignment: TextInput.AlignVCenter
+                                onTextEdited: root.draftSet("integrations.holidays.countryCode", text)
+                            }
+                        }
+                    }
+                }
+
                 Repeater {
-                    model: ["left", "center", "right"]
+                    model: root.activeTab === "blocks" ? ["left", "center", "right"] : []
                     delegate: Rectangle {
                         property string zone: modelData
                         property var usedModel: root.zoneUsedModel(zone)
