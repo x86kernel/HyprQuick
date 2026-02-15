@@ -7,6 +7,8 @@ PanelWindow {
     property var bar
     property bool open: false
     property real anim: open ? 1 : 0
+    property bool resetConfirmOpen: false
+    property bool saveNoticeOpen: false
     property var draftSettings: ({})
 
     property var zoneDefinitions: ({
@@ -184,18 +186,39 @@ PanelWindow {
         syncZoneModelsFromDraft()
     }
 
+    function requestReset() {
+        resetConfirmOpen = true
+    }
+
+    function confirmReset() {
+        ensureDraft()
+        resetConfirmOpen = false
+    }
+
     function saveSettings() {
         if (!bar) {
             return
         }
         bar.replaceSettings(draftSettings)
-        open = false
+        saveNoticeOpen = true
+        saveNoticeTimer.restart()
     }
 
     onOpenChanged: {
         if (open) {
             ensureDraft()
+        } else {
+            resetConfirmOpen = false
+            saveNoticeOpen = false
         }
+    }
+
+    Timer {
+        id: saveNoticeTimer
+        interval: 1600
+        running: false
+        repeat: false
+        onTriggered: root.saveNoticeOpen = false
     }
 
     Rectangle {
@@ -247,7 +270,7 @@ PanelWindow {
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: root.ensureDraft()
+                    onClicked: root.requestReset()
                 }
             }
 
@@ -496,6 +519,127 @@ PanelWindow {
                                         }
                                     }
                                 }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Rectangle {
+            visible: root.saveNoticeOpen
+            anchors.top: parent.top
+            anchors.right: parent.right
+            anchors.topMargin: 12
+            anchors.rightMargin: 12
+            radius: 8
+            color: Theme.accent
+            border.width: 1
+            border.color: Theme.blockBorder
+            implicitWidth: saveNoticeText.implicitWidth + 18
+            implicitHeight: saveNoticeText.implicitHeight + 10
+
+            Text {
+                id: saveNoticeText
+                anchors.centerIn: parent
+                text: "저장되었습니다!"
+                color: Theme.textOnAccent
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontSizeSmall
+                font.weight: Theme.fontWeight
+            }
+        }
+
+        Rectangle {
+            anchors.fill: parent
+            visible: root.resetConfirmOpen
+            color: "#00000088"
+
+            MouseArea {
+                anchors.fill: parent
+                onClicked: root.resetConfirmOpen = false
+            }
+
+            Rectangle {
+                property int popupPad: 14
+                width: 320
+                implicitHeight: confirmColumn.implicitHeight + popupPad * 2
+                height: implicitHeight
+                anchors.centerIn: parent
+                radius: Theme.blockRadius
+                color: Theme.blockBg
+                border.width: 1
+                border.color: Theme.blockBorder
+
+                Column {
+                    id: confirmColumn
+                    anchors.fill: parent
+                    anchors.margins: parent.popupPad
+                    spacing: 10
+
+                    Text {
+                        text: "Reset this panel?"
+                        color: Theme.textPrimary
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.fontSize
+                        font.weight: Theme.fontWeight
+                    }
+
+                    Text {
+                        text: "Unsaved block layout changes will be discarded."
+                        color: Theme.textPrimary
+                        opacity: 0.85
+                        wrapMode: Text.WordWrap
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.fontSizeSmall
+                        font.weight: Theme.fontWeight
+                    }
+
+                    Row {
+                        anchors.right: parent.right
+                        spacing: 8
+
+                        Rectangle {
+                            width: 84
+                            height: 32
+                            radius: 8
+                            color: Theme.blockBg
+                            border.width: 1
+                            border.color: Theme.blockBorder
+                            Text {
+                                anchors.centerIn: parent
+                                text: "Cancel"
+                                color: Theme.textPrimary
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeSmall
+                                font.weight: Theme.fontWeight
+                            }
+                            MouseArea {
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: root.resetConfirmOpen = false
+                            }
+                        }
+
+                        Rectangle {
+                            width: 84
+                            height: 32
+                            radius: 8
+                            color: Theme.accentAlt
+                            Text {
+                                anchors.centerIn: parent
+                                text: "Reset"
+                                color: Theme.textOnAccent
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeSmall
+                                font.weight: Theme.fontWeight
+                            }
+                            MouseArea {
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: root.confirmReset()
                             }
                         }
                     }
