@@ -7,7 +7,6 @@
   "toast.recording_scope_changed": "Recording Scope Changed",
   "toast.recording_scope_region": "Selected Region",
   "toast.recording_scope_fullscreen": "Fullscreen",
-
   "calendar.day.sun": "Sun",
   "calendar.day.mon": "Mon",
   "calendar.day.tue": "Tue",
@@ -15,12 +14,10 @@
   "calendar.day.thu": "Thu",
   "calendar.day.fri": "Fri",
   "calendar.day.sat": "Sat",
-
   "cpu.title": "CPU",
   "cpu.usage": "Usage",
   "cpu.temperature": "Temperature",
   "cpu.temp_na": "Temp: n/a",
-
   "bluetooth.title": "Bluetooth",
   "bluetooth.powered_on": "Powered On",
   "bluetooth.powered_off": "Powered Off",
@@ -28,7 +25,6 @@
   "bluetooth.turn_off": "Turn Off",
   "bluetooth.devices": "Devices",
   "bluetooth.no_devices": "No devices",
-
   "wifi.title": "WiFi",
   "wifi.not_connected": "Not connected",
   "wifi.turn_on": "Turn WiFi On",
@@ -41,12 +37,10 @@
   "wifi.password_placeholder": "Enter password",
   "wifi.connect_yes": "Yes",
   "wifi.connect_no": "No",
-
   "screenshot.title": "Screenshot Preview",
   "screenshot.save": "Save",
   "screenshot.copy": "Copy",
   "screenshot.close": "Close",
-
   "weather.feels_like_label": "Feels",
   "weather.location_prefix": "Location",
   "weather.humidity_label": "Humidity",
@@ -55,7 +49,6 @@
   "weather.error_prefix": "Weather error:",
   "weather.loading": "Loading weather...",
   "weather.unavailable": "Weather unavailable",
-
   "power.title": "Power",
   "power.lock": "Lock",
   "power.logout": "Logout",
@@ -64,15 +57,14 @@
   "power.confirm_hint": "Press the same button again to confirm",
   "power.confirm_suffix": "(press again)",
   "power.running": "Running...",
-
   "brightness.title": "Brightness",
   "volume.muted": "Muted",
   "clipboard.empty": "No clipboard items",
   "notification.empty": "No notifications",
-
   "settings.title": "Settings",
   "settings.tab.general": "General",
   "settings.tab.blocks": "Blocks",
+  "settings.tab.theme": "Theme",
   "settings.button.reset": "Reset",
   "settings.button.close": "Close",
   "settings.button.save": "Save",
@@ -84,6 +76,11 @@
   "settings.general.weather_api_key": "Weather API Key",
   "settings.general.weather_location": "Weather Location",
   "settings.general.holiday_country_code": "Holiday Country Code",
+  "settings.theme.title": "Theme",
+  "settings.theme.font_family": "UI Font Family",
+  "settings.theme.icon_font_family": "Icon Font Family",
+  "settings.theme.font_size": "Font Size",
+  "settings.theme.icon_size": "Icon Size",
   "settings.zone.left": "Left",
   "settings.zone.center": "Center",
   "settings.zone.right": "Right",
@@ -116,5 +113,6 @@
   "settings.block.bluetooth": "Bluetooth",
   "settings.block.wifi": "WiFi",
   "settings.block.battery": "Battery",
-  "settings.block.notifications": "Notifications"
+  "settings.block.notifications": "Notifications",
+  "settings.theme.search_font": "Search font..."
 }

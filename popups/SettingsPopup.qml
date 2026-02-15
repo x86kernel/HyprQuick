@@ -17,6 +17,14 @@ PanelWindow {
     property bool pendingWeatherValidation: false
     property bool pendingHolidayValidation: false
     property var pendingSaveSettings: ({})
+    property var systemFontFamilies: []
+    property bool fontsLoaded: false
+    property bool uiFontDropdownOpen: false
+    property bool iconFontDropdownOpen: false
+    property string uiFontSearchText: ""
+    property string iconFontSearchText: ""
+    property var uiFontFilteredFamilies: []
+    property var iconFontFilteredFamilies: []
 
     property var blockDefinitions: [
         { key: "workspace" },
@@ -129,6 +137,68 @@ PanelWindow {
         if (zone === "left") return tr("settings.zone.left", "Left")
         if (zone === "center") return tr("settings.zone.center", "Center")
         return tr("settings.zone.right", "Right")
+    }
+
+    function loadSystemFontFamilies() {
+        var list = []
+        try {
+            list = Qt.fontFamilies()
+        } catch (e) {
+            list = []
+        }
+        var out = []
+        var seen = {}
+        for (var i = 0; i < (list && list.length !== undefined ? list.length : 0); i += 1) {
+            var name = String(list[i] || "").trim()
+            if (name.length === 0) {
+                continue
+            }
+            var key = name.toLowerCase()
+            if (seen[key]) {
+                continue
+            }
+            seen[key] = true
+            out.push(name)
+        }
+        if (out.length === 0) {
+            out.push(String(Theme.fontFamily || "Sans Serif"))
+            if (String(Theme.iconFontFamily || "").length > 0 && Theme.iconFontFamily !== Theme.fontFamily) {
+                out.push(String(Theme.iconFontFamily))
+            }
+        }
+        out.sort(function(a, b) { return a.localeCompare(b) })
+        systemFontFamilies = out
+        fontsLoaded = true
+        refreshFontFilters()
+    }
+
+    function ensureFontFamiliesLoaded() {
+        if (fontsLoaded || fontLoadTimer.running) {
+            return
+        }
+        fontLoadTimer.start()
+    }
+
+    function filterFontFamilies(searchText) {
+        var q = String(searchText || "").trim().toLowerCase()
+        var out = []
+        for (var i = 0; i < systemFontFamilies.length; i += 1) {
+            var name = String(systemFontFamilies[i] || "")
+            if (q.length === 0 || name.toLowerCase().indexOf(q) !== -1) {
+                out.push(name)
+            }
+        }
+        return out
+    }
+
+    function refreshFontFilters() {
+        uiFontFilteredFamilies = filterFontFamilies(uiFontSearchText)
+        iconFontFilteredFamilies = filterFontFamilies(iconFontSearchText)
+    }
+
+    function syncFontSearchWithDraft() {
+        uiFontSearchText = String(draftGet("theme.font.family", Theme.fontFamily))
+        iconFontSearchText = String(draftGet("theme.font.iconFamily", Theme.iconFontFamily))
     }
 
     function zoneUsedModel(zone) {
@@ -251,6 +321,7 @@ PanelWindow {
         var base = bar.normalizedSettings(bar.appSettings || bar.defaultSettings())
         draftSettings = deepCopy(base)
         syncZoneModelsFromDraft()
+        syncFontSearchWithDraft()
     }
 
     function requestReset() {
@@ -430,8 +501,25 @@ PanelWindow {
             saveNoticeOpen = false
             saveValidationRunning = false
             saveValidationError = ""
+            uiFontDropdownOpen = false
+            iconFontDropdownOpen = false
+            uiFontSearchText = ""
+            iconFontSearchText = ""
         }
     }
+
+    onActiveTabChanged: {
+        if (activeTab === "theme") {
+            ensureFontFamiliesLoaded()
+            syncFontSearchWithDraft()
+            return
+        }
+        uiFontDropdownOpen = false
+        iconFontDropdownOpen = false
+    }
+
+    onUiFontSearchTextChanged: refreshFontFilters()
+    onIconFontSearchTextChanged: refreshFontFilters()
 
     Timer {
         id: saveNoticeTimer
@@ -439,6 +527,14 @@ PanelWindow {
         running: false
         repeat: false
         onTriggered: root.saveNoticeOpen = false
+    }
+
+    Timer {
+        id: fontLoadTimer
+        interval: 1
+        running: false
+        repeat: false
+        onTriggered: root.loadSystemFontFamilies()
     }
 
     Process {
@@ -556,6 +652,29 @@ PanelWindow {
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     onClicked: root.activeTab = "blocks"
+                }
+            }
+
+            Rectangle {
+                width: 86
+                height: 30
+                radius: 8
+                color: root.activeTab === "theme" ? Theme.accent : Theme.blockBg
+                border.width: 1
+                border.color: Theme.blockBorder
+                Text {
+                    anchors.centerIn: parent
+                    text: root.tr("settings.tab.theme", "Theme")
+                    color: root.activeTab === "theme" ? Theme.textOnAccent : Theme.textPrimary
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSizeSmall
+                    font.weight: Theme.fontWeight
+                }
+                MouseArea {
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.activeTab = "theme"
                 }
             }
         }
@@ -828,6 +947,393 @@ PanelWindow {
                                 selectedTextColor: Theme.textOnAccent
                                 verticalAlignment: TextInput.AlignVCenter
                                 onTextEdited: root.draftSet("integrations.holidays.countryCode", text)
+                            }
+                        }
+                    }
+                }
+
+                Rectangle {
+                    id: themePanel
+                    visible: root.activeTab === "theme"
+                    width: parent.width
+                    radius: Theme.blockRadius
+                    color: Theme.blockBg
+                    border.width: 1
+                    border.color: Theme.blockBorder
+                    implicitHeight: themeColumn.implicitHeight + 14
+
+                    Column {
+                        id: themeColumn
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.top: parent.top
+                        anchors.margins: 7
+                        spacing: 10
+
+                        Text {
+                            text: root.tr("settings.theme.title", "Theme")
+                            color: Theme.textPrimary
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSize
+                            font.weight: Theme.fontWeight
+                        }
+
+                        Text {
+                            text: root.tr("settings.theme.font_family", "UI Font Family")
+                            color: Theme.textPrimary
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSizeSmall
+                            font.weight: Theme.fontWeight
+                        }
+
+                        Rectangle {
+                            id: uiFontSelector
+                            width: themeColumn.width
+                            height: 34
+                            radius: 8
+                            color: "#1f2133"
+                            border.width: 1
+                            border.color: Theme.blockBorder
+                            HoverHandler { cursorShape: Qt.IBeamCursor }
+                            TextInput {
+                                id: uiFontInput
+                                anchors.left: parent.left
+                                anchors.right: dropdownIcon.left
+                                anchors.verticalCenter: parent.verticalCenter
+                                anchors.leftMargin: 10
+                                anchors.rightMargin: 8
+                                text: root.uiFontSearchText
+                                color: Theme.textPrimary
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeSmall
+                                font.weight: Theme.fontWeight
+                                verticalAlignment: TextInput.AlignVCenter
+                                onTextEdited: {
+                                    root.ensureFontFamiliesLoaded()
+                                    root.uiFontSearchText = text
+                                    root.uiFontDropdownOpen = true
+                                    root.iconFontDropdownOpen = false
+                                }
+                                onActiveFocusChanged: {
+                                    if (activeFocus) {
+                                        root.ensureFontFamiliesLoaded()
+                                        root.uiFontDropdownOpen = true
+                                        root.iconFontDropdownOpen = false
+                                    }
+                                }
+                            }
+                            Text {
+                                id: dropdownIcon
+                                anchors.right: parent.right
+                                anchors.verticalCenter: parent.verticalCenter
+                                anchors.rightMargin: 10
+                                text: root.uiFontDropdownOpen ? "▴" : "▾"
+                                color: Theme.textPrimary
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeSmall
+                            }
+                            MouseArea {
+                                anchors.top: parent.top
+                                anchors.bottom: parent.bottom
+                                anchors.right: parent.right
+                                width: 26
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    root.ensureFontFamiliesLoaded()
+                                    root.uiFontDropdownOpen = !root.uiFontDropdownOpen
+                                    if (root.uiFontDropdownOpen) {
+                                        root.iconFontDropdownOpen = false
+                                    }
+                                }
+                            }
+                        }
+
+                        Text {
+                            text: root.tr("settings.theme.icon_font_family", "Icon Font Family")
+                            color: Theme.textPrimary
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSizeSmall
+                            font.weight: Theme.fontWeight
+                        }
+
+                        Rectangle {
+                            id: iconFontSelector
+                            width: themeColumn.width
+                            height: 34
+                            radius: 8
+                            color: "#1f2133"
+                            border.width: 1
+                            border.color: Theme.blockBorder
+                            HoverHandler { cursorShape: Qt.IBeamCursor }
+                            TextInput {
+                                id: iconFontInput
+                                anchors.left: parent.left
+                                anchors.right: iconDropdownIcon.left
+                                anchors.verticalCenter: parent.verticalCenter
+                                anchors.leftMargin: 10
+                                anchors.rightMargin: 8
+                                text: root.iconFontSearchText
+                                color: Theme.textPrimary
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeSmall
+                                font.weight: Theme.fontWeight
+                                verticalAlignment: TextInput.AlignVCenter
+                                onTextEdited: {
+                                    root.ensureFontFamiliesLoaded()
+                                    root.iconFontSearchText = text
+                                    root.iconFontDropdownOpen = true
+                                    root.uiFontDropdownOpen = false
+                                }
+                                onActiveFocusChanged: {
+                                    if (activeFocus) {
+                                        root.ensureFontFamiliesLoaded()
+                                        root.iconFontDropdownOpen = true
+                                        root.uiFontDropdownOpen = false
+                                    }
+                                }
+                            }
+                            Text {
+                                id: iconDropdownIcon
+                                anchors.right: parent.right
+                                anchors.verticalCenter: parent.verticalCenter
+                                anchors.rightMargin: 10
+                                text: root.iconFontDropdownOpen ? "▴" : "▾"
+                                color: Theme.textPrimary
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeSmall
+                            }
+                            MouseArea {
+                                anchors.top: parent.top
+                                anchors.bottom: parent.bottom
+                                anchors.right: parent.right
+                                width: 26
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    root.ensureFontFamiliesLoaded()
+                                    root.iconFontDropdownOpen = !root.iconFontDropdownOpen
+                                    if (root.iconFontDropdownOpen) {
+                                        root.uiFontDropdownOpen = false
+                                    }
+                                }
+                            }
+                        }
+
+                        Row {
+                            spacing: 12
+
+                            Column {
+                                spacing: 6
+                                Text {
+                                    text: root.tr("settings.theme.font_size", "Font Size")
+                                    color: Theme.textPrimary
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: Theme.fontSizeSmall
+                                    font.weight: Theme.fontWeight
+                                }
+                                Rectangle {
+                                    width: 96
+                                    height: 34
+                                    radius: 8
+                                    color: "#1f2133"
+                                    border.width: 1
+                                    border.color: Theme.blockBorder
+                                    HoverHandler { cursorShape: Qt.IBeamCursor }
+                                    TextInput {
+                                        anchors.fill: parent
+                                        anchors.leftMargin: 10
+                                        anchors.rightMargin: 10
+                                        text: String(root.draftGet("theme.font.size", Theme.fontSize))
+                                        color: Theme.textPrimary
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontSizeSmall
+                                        verticalAlignment: TextInput.AlignVCenter
+                                        validator: IntValidator { bottom: 8; top: 48 }
+                                        onTextEdited: {
+                                            var n = Number(text)
+                                            if (!isNaN(n)) {
+                                                root.draftSet("theme.font.size", Math.max(8, Math.min(48, Math.round(n))))
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            Column {
+                                spacing: 6
+                                Text {
+                                    text: root.tr("settings.theme.icon_size", "Icon Size")
+                                    color: Theme.textPrimary
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: Theme.fontSizeSmall
+                                    font.weight: Theme.fontWeight
+                                }
+                                Rectangle {
+                                    width: 96
+                                    height: 34
+                                    radius: 8
+                                    color: "#1f2133"
+                                    border.width: 1
+                                    border.color: Theme.blockBorder
+                                    HoverHandler { cursorShape: Qt.IBeamCursor }
+                                    TextInput {
+                                        anchors.fill: parent
+                                        anchors.leftMargin: 10
+                                        anchors.rightMargin: 10
+                                        text: String(root.draftGet("theme.font.iconSize", Theme.iconSize))
+                                        color: Theme.textPrimary
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontSizeSmall
+                                        verticalAlignment: TextInput.AlignVCenter
+                                        validator: IntValidator { bottom: 8; top: 64 }
+                                        onTextEdited: {
+                                            var n = Number(text)
+                                            if (!isNaN(n)) {
+                                                root.draftSet("theme.font.iconSize", Math.max(8, Math.min(64, Math.round(n))))
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Item {
+                        id: themeOverlay
+                        anchors.fill: parent
+                        z: 40
+                        visible: root.activeTab === "theme"
+
+                        Rectangle {
+                            visible: root.uiFontDropdownOpen
+                            width: uiFontSelector.width
+                            height: Math.min(210, Math.max(44, root.uiFontFilteredFamilies.length * 30 + 8))
+                            radius: Theme.blockRadius
+                            color: "#1f2133"
+                            border.width: 1
+                            border.color: Theme.blockBorder
+                            clip: true
+                            z: 2
+                            x: uiFontSelector.mapToItem(themeOverlay, 0, 0).x
+                            y: uiFontSelector.mapToItem(themeOverlay, 0, uiFontSelector.height + 4).y
+
+                            Flickable {
+                                anchors.fill: parent
+                                anchors.margins: 4
+                                contentWidth: width
+                                contentHeight: uiFontList.implicitHeight
+                                clip: true
+                                boundsBehavior: Flickable.StopAtBounds
+
+                                Column {
+                                    id: uiFontList
+                                    width: parent.width
+                                    spacing: 2
+
+                                    Repeater {
+                                        model: root.uiFontFilteredFamilies
+                                        delegate: Rectangle {
+                                            width: uiFontList.width
+                                            height: 28
+                                            radius: 6
+                                            color: String(root.draftGet("theme.font.family", Theme.fontFamily)) === modelData
+                                                ? Theme.accentAlt
+                                                : "transparent"
+                                            Text {
+                                                anchors.left: parent.left
+                                                anchors.right: parent.right
+                                                anchors.verticalCenter: parent.verticalCenter
+                                                anchors.leftMargin: 8
+                                                anchors.rightMargin: 8
+                                                text: modelData
+                                                color: String(root.draftGet("theme.font.family", Theme.fontFamily)) === modelData
+                                                    ? Theme.textOnAccent
+                                                    : Theme.textPrimary
+                                                elide: Text.ElideRight
+                                                font.family: modelData
+                                                font.pixelSize: Theme.fontSizeSmall
+                                                font.weight: Theme.fontWeight
+                                            }
+                                            MouseArea {
+                                                anchors.fill: parent
+                                                hoverEnabled: true
+                                                cursorShape: Qt.PointingHandCursor
+                                                onClicked: {
+                                                    root.draftSet("theme.font.family", modelData)
+                                                    root.uiFontSearchText = String(modelData)
+                                                    root.uiFontDropdownOpen = false
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            visible: root.iconFontDropdownOpen
+                            width: iconFontSelector.width
+                            height: Math.min(180, Math.max(44, root.iconFontFilteredFamilies.length * 30 + 8))
+                            radius: Theme.blockRadius
+                            color: "#1f2133"
+                            border.width: 1
+                            border.color: Theme.blockBorder
+                            clip: true
+                            z: 2
+                            x: iconFontSelector.mapToItem(themeOverlay, 0, 0).x
+                            y: iconFontSelector.mapToItem(themeOverlay, 0, iconFontSelector.height + 4).y
+
+                            Flickable {
+                                anchors.fill: parent
+                                anchors.margins: 4
+                                contentWidth: width
+                                contentHeight: iconFontList.implicitHeight
+                                clip: true
+                                boundsBehavior: Flickable.StopAtBounds
+
+                                Column {
+                                    id: iconFontList
+                                    width: parent.width
+                                    spacing: 2
+
+                                    Repeater {
+                                        model: root.iconFontFilteredFamilies
+                                        delegate: Rectangle {
+                                            width: iconFontList.width
+                                            height: 28
+                                            radius: 6
+                                            color: String(root.draftGet("theme.font.iconFamily", Theme.iconFontFamily)) === modelData
+                                                ? Theme.accentAlt
+                                                : "transparent"
+                                            Text {
+                                                anchors.left: parent.left
+                                                anchors.right: parent.right
+                                                anchors.verticalCenter: parent.verticalCenter
+                                                anchors.leftMargin: 8
+                                                anchors.rightMargin: 8
+                                                text: modelData
+                                                color: String(root.draftGet("theme.font.iconFamily", Theme.iconFontFamily)) === modelData
+                                                    ? Theme.textOnAccent
+                                                    : Theme.textPrimary
+                                                elide: Text.ElideRight
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: Theme.fontSizeSmall
+                                                font.weight: Theme.fontWeight
+                                            }
+                                            MouseArea {
+                                                anchors.fill: parent
+                                                hoverEnabled: true
+                                                cursorShape: Qt.PointingHandCursor
+                                                onClicked: {
+                                                    root.draftSet("theme.font.iconFamily", modelData)
+                                                    root.iconFontSearchText = String(modelData)
+                                                    root.iconFontDropdownOpen = false
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
