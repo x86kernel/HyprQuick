@@ -19,21 +19,21 @@ PanelWindow {
     property var pendingSaveSettings: ({})
 
     property var blockDefinitions: [
-        { key: "workspace", label: "Workspace" },
-        { key: "focusedWindow", label: "Focused Window" },
-        { key: "media", label: "Media" },
-        { key: "vpn", label: "VPN" },
-        { key: "clock", label: "Clock" },
-        { key: "screenCapture", label: "Capture/Record" },
-        { key: "systemTray", label: "System Tray" },
-        { key: "volume", label: "Volume" },
-        { key: "clipboard", label: "Clipboard" },
-        { key: "cpu", label: "CPU" },
-        { key: "memory", label: "Memory" },
-        { key: "bluetooth", label: "Bluetooth" },
-        { key: "wifi", label: "WiFi" },
-        { key: "battery", label: "Battery" },
-        { key: "notifications", label: "Notifications" }
+        { key: "workspace" },
+        { key: "focusedWindow" },
+        { key: "media" },
+        { key: "vpn" },
+        { key: "clock" },
+        { key: "screenCapture" },
+        { key: "systemTray" },
+        { key: "volume" },
+        { key: "clipboard" },
+        { key: "cpu" },
+        { key: "memory" },
+        { key: "bluetooth" },
+        { key: "wifi" },
+        { key: "battery" },
+        { key: "notifications" }
     ]
 
     property var targetScreen: bar ? bar.screen : null
@@ -70,6 +70,11 @@ PanelWindow {
         }
     }
 
+    function tr(key, fallbackText) {
+        var v = I18n.t(key)
+        return v === key ? fallbackText : v
+    }
+
     function draftGet(path, fallbackValue) {
         var parts = String(path || "").split(".")
         var cur = draftSettings
@@ -102,12 +107,28 @@ PanelWindow {
     }
 
     function labelFor(key) {
-        for (var i = 0; i < blockDefinitions.length; i += 1) {
-            if (blockDefinitions[i].key === key) {
-                return blockDefinitions[i].label
-            }
-        }
+        if (key === "workspace") return tr("settings.block.workspace", "Workspace")
+        if (key === "focusedWindow") return tr("settings.block.focused_window", "Focused Window")
+        if (key === "media") return tr("settings.block.media", "Media")
+        if (key === "vpn") return tr("settings.block.vpn", "VPN")
+        if (key === "clock") return tr("settings.block.clock", "Clock")
+        if (key === "screenCapture") return tr("settings.block.capture_record", "Capture/Record")
+        if (key === "systemTray") return tr("settings.block.system_tray", "System Tray")
+        if (key === "volume") return tr("settings.block.volume", "Volume")
+        if (key === "clipboard") return tr("settings.block.clipboard", "Clipboard")
+        if (key === "cpu") return tr("settings.block.cpu", "CPU")
+        if (key === "memory") return tr("settings.block.memory", "Memory")
+        if (key === "bluetooth") return tr("settings.block.bluetooth", "Bluetooth")
+        if (key === "wifi") return tr("settings.block.wifi", "WiFi")
+        if (key === "battery") return tr("settings.block.battery", "Battery")
+        if (key === "notifications") return tr("settings.block.notifications", "Notifications")
         return key
+    }
+
+    function zoneLabel(zone) {
+        if (zone === "left") return tr("settings.zone.left", "Left")
+        if (zone === "center") return tr("settings.zone.center", "Center")
+        return tr("settings.zone.right", "Right")
     }
 
     function zoneUsedModel(zone) {
@@ -287,25 +308,27 @@ PanelWindow {
     function parseWeatherValidationError(rawText) {
         var text = String(rawText || "").trim()
         if (text.length === 0) {
-            return "Weather validation failed: empty response."
+            return tr("settings.error.weather_empty", "Weather validation failed: empty response.")
         }
         if (text.indexOf("__QSERR__") === 0) {
-            return "Weather validation failed: " + text.replace("__QSERR__", "").trim()
+            return tr("settings.error.weather_prefix", "Weather validation failed:")
+                + " " + text.replace("__QSERR__", "").trim()
         }
         var payload = null
         try {
             payload = JSON.parse(text)
         } catch (e) {
-            return "Weather validation failed: invalid response."
+            return tr("settings.error.weather_invalid_response", "Weather validation failed: invalid response.")
         }
         if (!payload || typeof payload !== "object") {
-            return "Weather validation failed: invalid payload."
+            return tr("settings.error.weather_invalid_payload", "Weather validation failed: invalid payload.")
         }
         if (payload.error) {
-            return "Weather validation failed: " + String(payload.error.message || "unknown error")
+            return tr("settings.error.weather_prefix", "Weather validation failed:")
+                + " " + String(payload.error.message || tr("settings.error.unknown", "unknown error"))
         }
         if (!payload.location || !payload.current) {
-            return "Weather validation failed: incomplete payload."
+            return tr("settings.error.weather_incomplete_payload", "Weather validation failed: incomplete payload.")
         }
         return ""
     }
@@ -313,24 +336,26 @@ PanelWindow {
     function parseHolidayValidationError(rawText) {
         var text = String(rawText || "").trim()
         if (text.length === 0) {
-            return "Holiday validation failed: empty response."
+            return tr("settings.error.holiday_empty", "Holiday validation failed: empty response.")
         }
         if (text.indexOf("__QSERR__") === 0) {
-            return "Holiday validation failed: " + text.replace("__QSERR__", "").trim()
+            return tr("settings.error.holiday_prefix", "Holiday validation failed:")
+                + " " + text.replace("__QSERR__", "").trim()
         }
         var payload = null
         try {
             payload = JSON.parse(text)
         } catch (e) {
-            return "Holiday validation failed: invalid response."
+            return tr("settings.error.holiday_invalid_response", "Holiday validation failed: invalid response.")
         }
         if (Array.isArray(payload)) {
             return ""
         }
         if (payload && payload.message) {
-            return "Holiday validation failed: " + String(payload.message)
+            return tr("settings.error.holiday_prefix", "Holiday validation failed:")
+                + " " + String(payload.message)
         }
-        return "Holiday validation failed: invalid country code or API response."
+        return tr("settings.error.holiday_invalid_country", "Holiday validation failed: invalid country code or API response.")
     }
 
     function syncGeneralInputsToDraft() {
@@ -473,7 +498,7 @@ PanelWindow {
             anchors.leftMargin: 14
             anchors.rightMargin: 14
             anchors.topMargin: 12
-            text: "Settings"
+            text: root.tr("settings.title", "Settings")
             color: Theme.accent
             font.family: Theme.fontFamily
             font.pixelSize: Theme.controllerFontSize
@@ -497,7 +522,7 @@ PanelWindow {
                 border.color: Theme.blockBorder
                 Text {
                     anchors.centerIn: parent
-                    text: "일반"
+                    text: root.tr("settings.tab.general", "General")
                     color: root.activeTab === "general" ? Theme.textOnAccent : Theme.textPrimary
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.fontSizeSmall
@@ -520,7 +545,7 @@ PanelWindow {
                 border.color: Theme.blockBorder
                 Text {
                     anchors.centerIn: parent
-                    text: "블록"
+                    text: root.tr("settings.tab.blocks", "Blocks")
                     color: root.activeTab === "blocks" ? Theme.textOnAccent : Theme.textPrimary
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.fontSizeSmall
@@ -550,7 +575,7 @@ PanelWindow {
                 color: Theme.accentAlt
                 Text {
                     anchors.centerIn: parent
-                    text: "Reset"
+                    text: root.tr("settings.button.reset", "Reset")
                     color: Theme.textOnAccent
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.fontSize
@@ -573,7 +598,7 @@ PanelWindow {
                 border.color: Theme.blockBorder
                 Text {
                     anchors.centerIn: parent
-                    text: "Close"
+                    text: root.tr("settings.button.close", "Close")
                     color: Theme.textPrimary
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.fontSize
@@ -594,7 +619,9 @@ PanelWindow {
                 color: Theme.accent
                 Text {
                     anchors.centerIn: parent
-                    text: root.saveValidationRunning ? "Validating..." : "Save"
+                    text: root.saveValidationRunning
+                        ? root.tr("settings.button.validating", "Validating...")
+                        : root.tr("settings.button.save", "Save")
                     color: Theme.textOnAccent
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.fontSize
@@ -661,7 +688,7 @@ PanelWindow {
                         spacing: 10
 
                         Text {
-                            text: "General"
+                            text: root.tr("settings.general.title", "General")
                             color: Theme.textPrimary
                             font.family: Theme.fontFamily
                             font.pixelSize: Theme.fontSize
@@ -669,7 +696,7 @@ PanelWindow {
                         }
 
                         Text {
-                            text: "Locale"
+                            text: root.tr("settings.general.locale", "Locale")
                             color: Theme.textPrimary
                             font.family: Theme.fontFamily
                             font.pixelSize: Theme.fontSizeSmall
@@ -706,7 +733,7 @@ PanelWindow {
                         }
 
                         Text {
-                            text: "Weather API Key"
+                            text: root.tr("settings.general.weather_api_key", "Weather API Key")
                             color: Theme.textPrimary
                             font.family: Theme.fontFamily
                             font.pixelSize: Theme.fontSizeSmall
@@ -739,7 +766,7 @@ PanelWindow {
                         }
 
                         Text {
-                            text: "Weather Location"
+                            text: root.tr("settings.general.weather_location", "Weather Location")
                             color: Theme.textPrimary
                             font.family: Theme.fontFamily
                             font.pixelSize: Theme.fontSizeSmall
@@ -772,7 +799,7 @@ PanelWindow {
                         }
 
                         Text {
-                            text: "Holiday Country Code"
+                            text: root.tr("settings.general.holiday_country_code", "Holiday Country Code")
                             color: Theme.textPrimary
                             font.family: Theme.fontFamily
                             font.pixelSize: Theme.fontSizeSmall
@@ -828,7 +855,7 @@ PanelWindow {
                             spacing: 8
 
                             Text {
-                                text: zone.toUpperCase() + " Blocks"
+                                text: root.zoneLabel(zone) + " " + root.tr("settings.blocks.title_suffix", "Blocks")
                                 color: Theme.textPrimary
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Theme.fontSize
@@ -836,7 +863,7 @@ PanelWindow {
                             }
 
                             Text {
-                                text: "사용함 (클릭: 사용안함, 드래그: 순서변경)"
+                                text: root.tr("settings.blocks.used_hint", "Used (Click: disable, Drag: reorder)")
                                 color: Theme.textPrimary
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Theme.fontSizeSmall
@@ -947,7 +974,7 @@ PanelWindow {
                             }
 
                             Text {
-                                text: "사용안함 (클릭: 사용함으로)"
+                                text: root.tr("settings.blocks.unused_hint", "Unused (Click: enable)")
                                 color: Theme.textPrimary
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Theme.fontSizeSmall
@@ -991,6 +1018,7 @@ PanelWindow {
                         }
                     }
                 }
+
             }
         }
 
@@ -1010,7 +1038,7 @@ PanelWindow {
             Text {
                 id: saveNoticeText
                 anchors.centerIn: parent
-                text: "저장되었습니다!"
+                text: root.tr("settings.saved", "Saved!")
                 color: Theme.textOnAccent
                 font.family: Theme.fontFamily
                 font.pixelSize: Theme.fontSizeSmall
@@ -1046,7 +1074,7 @@ PanelWindow {
                     spacing: 10
 
                     Text {
-                        text: "Reset this panel?"
+                        text: root.tr("settings.reset_confirm.title", "Reset this panel?")
                         color: Theme.textPrimary
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontSize
@@ -1054,7 +1082,7 @@ PanelWindow {
                     }
 
                     Text {
-                        text: "Unsaved block layout changes will be discarded."
+                        text: root.tr("settings.reset_confirm.body", "Unsaved block layout changes will be discarded.")
                         color: Theme.textPrimary
                         opacity: 0.85
                         wrapMode: Text.WordWrap
@@ -1076,7 +1104,7 @@ PanelWindow {
                             border.color: Theme.blockBorder
                             Text {
                                 anchors.centerIn: parent
-                                text: "Cancel"
+                                text: root.tr("settings.button.cancel", "Cancel")
                                 color: Theme.textPrimary
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Theme.fontSizeSmall
@@ -1097,7 +1125,7 @@ PanelWindow {
                             color: Theme.accentAlt
                             Text {
                                 anchors.centerIn: parent
-                                text: "Reset"
+                                text: root.tr("settings.button.reset", "Reset")
                                 color: Theme.textOnAccent
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Theme.fontSizeSmall
