@@ -46,6 +46,7 @@ Singleton {
     property bool wifiAvailable: true
     property bool wifiRadioOn: true
     property var wifiNetworks: []
+    property string wifiLastError: ""
 
     property bool bluetoothPowered: false
     property int bluetoothConnectedCount: 0
@@ -624,8 +625,45 @@ Singleton {
     }
 
     // WiFi
+    function splitNmcliEscaped(line) {
+        var out = []
+        var cur = ""
+        var escaped = false
+        var text = String(line || "")
+        for (var i = 0; i < text.length; i += 1) {
+            var ch = text[i]
+            if (escaped) {
+                cur += ch
+                escaped = false
+                continue
+            }
+            if (ch === "\\") {
+                escaped = true
+                continue
+            }
+            if (ch === ":") {
+                out.push(cur)
+                cur = ""
+                continue
+            }
+            cur += ch
+        }
+        if (escaped) {
+            cur += "\\"
+        }
+        out.push(cur)
+        return out
+    }
+
+    function nmcliUnescape(value) {
+        var text = String(value || "")
+        return text
+            .replace(/\\:/g, ":")
+            .replace(/\\\\/g, "\\")
+    }
+
     function parseWifiSsid(text) {
-        var line = String(text || "").trim()
+        var line = nmcliUnescape(String(text || "").trim())
         if (line.length === 0) {
             wifiSsid = ""
             wifiAvailable = false
@@ -646,11 +684,11 @@ Singleton {
         for (var i = 0; i < lines.length; i += 1) {
             var line = lines[i].trim()
             if (line.length === 0) continue
-            var parts = line.split(":")
+            var parts = splitNmcliEscaped(line)
             if (parts.length < 4) continue
             var active = parts[0] === "yes"
-            var ssidValue = parts[1]
-            var securityValue = parts[2]
+            var ssidValue = nmcliUnescape(parts[1])
+            var securityValue = nmcliUnescape(parts[2])
             var signal = Number(parts[3])
             if (ssidValue.length === 0) continue
             var secure = securityValue.length > 0 && securityValue !== "--"
@@ -685,10 +723,19 @@ Singleton {
         if (!ssidValue || ssidValue.length === 0) {
             return
         }
-        var cmd = "nmcli dev wifi connect " + shellEscape(ssidValue)
+        var cmd = "nmcli --wait 15 device wifi connect " + shellEscape(ssidValue)
         if (passwordValue && passwordValue.length > 0) cmd += " password " + shellEscape(passwordValue)
-        if (securityValue && securityValue.length > 0) cmd += " wifi-sec.key-mgmt " + shellEscape(securityValue)
-        wifiConnectProc.command = ["sh", "-c", cmd]
+        // Let nmcli determine key management from AP capabilities.
+        // Forcing wifi-sec.key-mgmt here can break normal WPA2/WPA3 connections.
+        wifiLastError = ""
+        var retryCmd = "nmcli --wait 15 device wifi connect " + shellEscape(ssidValue)
+        if (passwordValue && passwordValue.length > 0) retryCmd += " password " + shellEscape(passwordValue)
+        var wrapped = "out=$(" + cmd + " 2>&1); code=$?; " +
+            "if [ \"$code\" -ne 0 ]; then " +
+            "nmcli connection delete id " + shellEscape(ssidValue) + " >/dev/null 2>&1 || true; " +
+            "out=$(" + retryCmd + " 2>&1); code=$?; fi; " +
+            "if [ \"$code\" -ne 0 ]; then printf '__QSERR__ %s\\n' \"$out\"; else printf '__QSOK__\\n'; fi"
+        wifiConnectProc.command = ["sh", "-c", wrapped]
         wifiConnectProc.running = true
     }
 
@@ -737,7 +784,17 @@ Singleton {
     Process {
         id: wifiConnectProc
         running: false
-        stdout: StdioCollector { onStreamFinished: state.refreshWifi() }
+        stdout: StdioCollector {
+            onStreamFinished: {
+                var out = String(this.text || "").trim()
+                if (out.indexOf("__QSERR__") === 0) {
+                    state.wifiLastError = out.replace("__QSERR__", "").trim()
+                } else {
+                    state.wifiLastError = ""
+                }
+                state.refreshWifi()
+            }
+        }
     }
 
     Process {

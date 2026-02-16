@@ -406,6 +406,9 @@ ShellRoot {
                 clipboardPopup.open = false
                 notificationPopup.open = false
                 dateWidgetPopup.open = false
+                settingsPopup.open = false
+                volumePopup.open = false
+                brightnessPopup.open = false
                 closeScreenshotPreview(true)
             }
 
@@ -545,8 +548,17 @@ ShellRoot {
 
             HyprlandFocusGrab {
                 id: controllerFocusGrab
-                windows: [bar, cpuPopup, bluetoothPopup, wifiPopup, clipboardPopup, notificationPopup, dateWidgetPopup, settingsPopup]
-                active: bluetoothPopup.open || wifiPopup.open || cpuPopup.open || clipboardPopup.open || notificationPopup.open || dateWidgetPopup.open || settingsPopup.open
+                windows: [bar, cpuPopup, bluetoothPopup, wifiPopup, clipboardPopup, notificationPopup, dateWidgetPopup, settingsPopup, volumePopup, brightnessPopup, screenshotPopup]
+                active: bluetoothPopup.open
+                    || wifiPopup.open
+                    || cpuPopup.open
+                    || clipboardPopup.open
+                    || notificationPopup.open
+                    || dateWidgetPopup.open
+                    || settingsPopup.open
+                    || volumePopup.open
+                    || brightnessPopup.open
+                    || screenshotPopup.open
                 onCleared: bar.closeControllers()
             }
 

@@ -591,6 +591,23 @@ PopupWindow {
                 }
             }
         }
+
+        Text {
+            id: wifiErrorText
+            anchors.left: wifiContent.left
+            anchors.right: wifiContent.right
+            anchors.bottom: root.pageIndex === 1 ? connectButtons.top : wifiContent.bottom
+            anchors.bottomMargin: 8
+            visible: wifiIndicator && wifiIndicator.lastError && wifiIndicator.lastError.length > 0
+            text: wifiIndicator && wifiIndicator.lastError ? wifiIndicator.lastError : ""
+            color: "#ff8fa3"
+            wrapMode: Text.WordWrap
+            maximumLineCount: 3
+            elide: Text.ElideRight
+            font.family: Theme.fontFamily
+            font.pixelSize: Theme.controllerFontSizeSmall
+            font.weight: Theme.fontWeight
+        }
     }
 
     onOpenChanged: {

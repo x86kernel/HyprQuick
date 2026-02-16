@@ -7,6 +7,7 @@ Item {
     property bool available: SystemState.wifiAvailable
     property bool radioOn: SystemState.wifiRadioOn
     property var networks: SystemState.wifiNetworks
+    property string lastError: SystemState.wifiLastError
     signal clicked
 
     implicitHeight: container.implicitHeight
