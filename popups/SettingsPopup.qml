@@ -47,7 +47,12 @@ PanelWindow {
     property var targetScreen: bar ? bar.screen : null
 
     visible: open || anim > 0.01
-    Behavior on anim { NumberAnimation { duration: Theme.controllerAnimMs; easing.type: Easing.OutCubic } }
+    Behavior on anim {
+        NumberAnimation {
+            duration: root.open ? Theme.controllerAnimMs : 70
+            easing.type: Easing.OutCubic
+        }
+    }
     color: "transparent"
     screen: targetScreen
     focusable: true
@@ -199,6 +204,11 @@ PanelWindow {
     function syncFontSearchWithDraft() {
         uiFontSearchText = String(draftGet("theme.font.family", Theme.fontFamily))
         iconFontSearchText = String(draftGet("theme.font.iconFamily", Theme.iconFontFamily))
+    }
+
+    function clearFontInputFocus() {
+        if (uiFontInput) uiFontInput.focus = false
+        if (iconFontInput) iconFontInput.focus = false
     }
 
     function zoneUsedModel(zone) {
@@ -496,6 +506,7 @@ PanelWindow {
     onOpenChanged: {
         if (open) {
             ensureDraft()
+            Qt.callLater(function() { root.clearFontInputFocus() })
         } else {
             resetConfirmOpen = false
             saveNoticeOpen = false
@@ -505,6 +516,7 @@ PanelWindow {
             iconFontDropdownOpen = false
             uiFontSearchText = ""
             iconFontSearchText = ""
+            clearFontInputFocus()
         }
     }
 
@@ -1191,6 +1203,43 @@ PanelWindow {
                                             var n = Number(text)
                                             if (!isNaN(n)) {
                                                 root.draftSet("theme.font.iconSize", Math.max(8, Math.min(64, Math.round(n))))
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            Column {
+                                spacing: 6
+                                Text {
+                                    text: root.tr("settings.theme.font_weight", "Font Weight")
+                                    color: Theme.textPrimary
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: Theme.fontSizeSmall
+                                    font.weight: Theme.fontWeight
+                                }
+                                Rectangle {
+                                    width: 106
+                                    height: 34
+                                    radius: 8
+                                    color: "#1f2133"
+                                    border.width: 1
+                                    border.color: Theme.blockBorder
+                                    HoverHandler { cursorShape: Qt.IBeamCursor }
+                                    TextInput {
+                                        anchors.fill: parent
+                                        anchors.leftMargin: 10
+                                        anchors.rightMargin: 10
+                                        text: String(root.draftGet("theme.font.weight", Theme.fontWeight))
+                                        color: Theme.textPrimary
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontSizeSmall
+                                        verticalAlignment: TextInput.AlignVCenter
+                                        validator: IntValidator { bottom: 1; top: 1000 }
+                                        onTextEdited: {
+                                            var n = Number(text)
+                                            if (!isNaN(n)) {
+                                                root.draftSet("theme.font.weight", Math.max(1, Math.min(1000, Math.round(n))))
                                             }
                                         }
                                     }

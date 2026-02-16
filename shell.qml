@@ -570,14 +570,34 @@ ShellRoot {
                         anchors.verticalCenter: parent.verticalCenter
                         Repeater {
                             model: bar.zoneLayout("left")
-                            delegate: Loader {
+                            delegate: Item {
                                 property string blockKey: modelData
-                                sourceComponent: bar.componentForBlock(blockKey)
-                                onLoaded: bar.registerBlockRef(blockKey, item)
-                                onItemChanged: {
-                                    if (!item) {
-                                        bar.registerBlockRef(blockKey, null)
+                                implicitWidth: blockLoader.implicitWidth
+                                implicitHeight: blockLoader.implicitHeight
+
+                                Loader {
+                                    id: blockLoader
+                                    sourceComponent: bar.componentForBlock(parent.blockKey)
+                                    onLoaded: bar.registerBlockRef(parent.blockKey, item)
+                                    onItemChanged: {
+                                        if (!item) {
+                                            bar.registerBlockRef(parent.blockKey, null)
+                                        }
                                     }
+                                }
+
+                                DropShadow {
+                                    anchors.fill: blockLoader
+                                    source: blockLoader
+                                    horizontalOffset: Theme.blockShadowOffsetX
+                                    verticalOffset: Theme.blockShadowOffsetY
+                                    radius: Theme.blockShadowRadius
+                                    samples: Theme.blockShadowSamples
+                                    color: Theme.blockShadowColor
+                                    transparentBorder: true
+                                    cached: true
+                                    visible: Theme.blockShadowEnabled && !!blockLoader.item
+                                    z: -1
                                 }
                             }
                         }
@@ -601,14 +621,34 @@ ShellRoot {
                         anchors.right: parent.right
                         Repeater {
                             model: bar.zoneLayout("right")
-                            delegate: Loader {
+                            delegate: Item {
                                 property string blockKey: modelData
-                                sourceComponent: bar.componentForBlock(blockKey)
-                                onLoaded: bar.registerBlockRef(blockKey, item)
-                                onItemChanged: {
-                                    if (!item) {
-                                        bar.registerBlockRef(blockKey, null)
+                                implicitWidth: blockLoader.implicitWidth
+                                implicitHeight: blockLoader.implicitHeight
+
+                                Loader {
+                                    id: blockLoader
+                                    sourceComponent: bar.componentForBlock(parent.blockKey)
+                                    onLoaded: bar.registerBlockRef(parent.blockKey, item)
+                                    onItemChanged: {
+                                        if (!item) {
+                                            bar.registerBlockRef(parent.blockKey, null)
+                                        }
                                     }
+                                }
+
+                                DropShadow {
+                                    anchors.fill: blockLoader
+                                    source: blockLoader
+                                    horizontalOffset: Theme.blockShadowOffsetX
+                                    verticalOffset: Theme.blockShadowOffsetY
+                                    radius: Theme.blockShadowRadius
+                                    samples: Theme.blockShadowSamples
+                                    color: Theme.blockShadowColor
+                                    transparentBorder: true
+                                    cached: true
+                                    visible: Theme.blockShadowEnabled && !!blockLoader.item
+                                    z: -1
                                 }
                             }
                         }
@@ -623,14 +663,34 @@ ShellRoot {
                 spacing: Theme.blockGap
                 Repeater {
                     model: bar.zoneLayout("center")
-                    delegate: Loader {
+                    delegate: Item {
                         property string blockKey: modelData
-                        sourceComponent: bar.componentForBlock(blockKey)
-                        onLoaded: bar.registerBlockRef(blockKey, item)
-                        onItemChanged: {
-                            if (!item) {
-                                bar.registerBlockRef(blockKey, null)
+                        implicitWidth: blockLoader.implicitWidth
+                        implicitHeight: blockLoader.implicitHeight
+
+                        Loader {
+                            id: blockLoader
+                            sourceComponent: bar.componentForBlock(parent.blockKey)
+                            onLoaded: bar.registerBlockRef(parent.blockKey, item)
+                            onItemChanged: {
+                                if (!item) {
+                                    bar.registerBlockRef(parent.blockKey, null)
+                                }
                             }
+                        }
+
+                        DropShadow {
+                            anchors.fill: blockLoader
+                            source: blockLoader
+                            horizontalOffset: Theme.blockShadowOffsetX
+                            verticalOffset: Theme.blockShadowOffsetY
+                            radius: Theme.blockShadowRadius
+                            samples: Theme.blockShadowSamples
+                            color: Theme.blockShadowColor
+                            transparentBorder: true
+                            cached: true
+                            visible: Theme.blockShadowEnabled && !!blockLoader.item
+                            z: -1
                         }
                     }
                 }

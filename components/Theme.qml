@@ -233,6 +233,12 @@ Singleton {
 
     property color blockBg: "#242438"
     property color blockBorder: "transparent"
+    property bool blockShadowEnabled: true
+    property color blockShadowColor: "#00000099"
+    property int blockShadowRadius: 16
+    property int blockShadowSamples: 33
+    property int blockShadowOffsetX: 0
+    property int blockShadowOffsetY: 4
 
     property color accent: "#f5c2e7"
     property color accentAlt: "#b4befe"

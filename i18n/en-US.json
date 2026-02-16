@@ -81,6 +81,7 @@
   "settings.theme.icon_font_family": "Icon Font Family",
   "settings.theme.font_size": "Font Size",
   "settings.theme.icon_size": "Icon Size",
+  "settings.theme.font_weight": "Font Weight",
   "settings.zone.left": "Left",
   "settings.zone.center": "Center",
   "settings.zone.right": "Right",

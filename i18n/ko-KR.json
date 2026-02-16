@@ -81,6 +81,7 @@
   "settings.theme.icon_font_family": "아이콘 폰트",
   "settings.theme.font_size": "폰트 크기",
   "settings.theme.icon_size": "아이콘 크기",
+  "settings.theme.font_weight": "폰트 굵기",
   "settings.zone.left": "왼쪽",
   "settings.zone.center": "가운데",
   "settings.zone.right": "오른쪽",
