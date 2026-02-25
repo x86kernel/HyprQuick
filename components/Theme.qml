@@ -214,6 +214,12 @@ Singleton {
     property int cpuPopupOffset: 8
     property color cpuPopupBg: "#181826"
     property color cpuPopupBorder: "transparent"
+    property int memoryPopupWidth: 360
+    property int memoryPopupPadding: 12
+    property int memoryPopupRadius: 12
+    property int memoryPopupOffset: 8
+    property color memoryPopupBg: "#181826"
+    property color memoryPopupBorder: "transparent"
 
     property string clipboardIcon: "󰅌"
     property int clipboardFlashDuration: 1500

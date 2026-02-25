@@ -4,6 +4,7 @@ import "."
 Item {
     id: root
     property real usage: SystemState.memoryUsage
+    signal clicked
 
     implicitHeight: container.implicitHeight
     implicitWidth: container.implicitWidth
@@ -47,6 +48,13 @@ Item {
                 height: row.height
                 verticalAlignment: Text.AlignVCenter
             }
+        }
+
+        MouseArea {
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: root.clicked()
         }
     }
 }

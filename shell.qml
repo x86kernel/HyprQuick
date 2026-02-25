@@ -80,6 +80,7 @@ ShellRoot {
             property string weatherError: SystemState.weatherError
             property double weatherLastFetchMs: SystemState.weatherLastFetchMs
             property var cpuUsageIndicatorRef: null
+            property var memoryUsageIndicatorRef: null
             property var bluetoothIndicatorRef: null
             property var wifiIndicatorRef: null
             property var volumeIndicatorRef: null
@@ -211,6 +212,7 @@ ShellRoot {
 
             function registerBlockRef(blockKey, item) {
                 if (blockKey === "cpu") cpuUsageIndicatorRef = item
+                else if (blockKey === "memory") memoryUsageIndicatorRef = item
                 else if (blockKey === "bluetooth") bluetoothIndicatorRef = item
                 else if (blockKey === "wifi") wifiIndicatorRef = item
                 else if (blockKey === "volume") volumeIndicatorRef = item
@@ -248,6 +250,18 @@ ShellRoot {
                 cpuPopup.anchor.rect.y = pos.y + Theme.cpuPopupOffset
                 cpuPopup.anchor.rect.width = 1
                 cpuPopup.anchor.rect.height = 1
+            }
+
+            function updateMemoryPopupAnchor() {
+                if (!memoryUsageIndicatorRef) {
+                    return
+                }
+                var anchorItem = bar.contentItem ? bar.contentItem : bar
+                var pos = memoryUsageIndicatorRef.mapToItem(anchorItem, 0, memoryUsageIndicatorRef.height)
+                memoryPopup.anchor.rect.x = pos.x + memoryUsageIndicatorRef.width - Theme.memoryPopupWidth
+                memoryPopup.anchor.rect.y = pos.y + Theme.memoryPopupOffset
+                memoryPopup.anchor.rect.width = 1
+                memoryPopup.anchor.rect.height = 1
             }
 
             function updateBluetoothPopupAnchor() {
@@ -359,6 +373,7 @@ ShellRoot {
                 bluetoothPopup.open = false
                 wifiPopup.open = false
                 cpuPopup.open = false
+                memoryPopup.open = false
                 clipboardPopup.open = false
                 notificationPopup.open = false
                 dateWidgetPopup.open = false
@@ -403,6 +418,7 @@ ShellRoot {
                 bluetoothPopup.open = false
                 wifiPopup.open = false
                 cpuPopup.open = false
+                memoryPopup.open = false
                 clipboardPopup.open = false
                 notificationPopup.open = false
                 dateWidgetPopup.open = false
@@ -419,6 +435,7 @@ ShellRoot {
                 }
                 wifiPopup.open = false
                 cpuPopup.open = false
+                memoryPopup.open = false
                 clipboardPopup.open = false
                 notificationPopup.open = false
                 dateWidgetPopup.open = false
@@ -433,6 +450,7 @@ ShellRoot {
                 }
                 bluetoothPopup.open = false
                 cpuPopup.open = false
+                memoryPopup.open = false
                 clipboardPopup.open = false
                 notificationPopup.open = false
                 dateWidgetPopup.open = false
@@ -448,10 +466,26 @@ ShellRoot {
                 bluetoothPopup.open = false
                 wifiPopup.open = false
                 clipboardPopup.open = false
+                memoryPopup.open = false
                 notificationPopup.open = false
                 dateWidgetPopup.open = false
                 closeScreenshotPreview(true)
                 cpuPopup.open = true
+            }
+
+            function toggleMemoryController() {
+                if (memoryPopup.open) {
+                    memoryPopup.open = false
+                    return
+                }
+                bluetoothPopup.open = false
+                wifiPopup.open = false
+                cpuPopup.open = false
+                clipboardPopup.open = false
+                notificationPopup.open = false
+                dateWidgetPopup.open = false
+                closeScreenshotPreview(true)
+                memoryPopup.open = true
             }
 
             function toggleClipboardController() {
@@ -462,6 +496,7 @@ ShellRoot {
                 bluetoothPopup.open = false
                 wifiPopup.open = false
                 cpuPopup.open = false
+                memoryPopup.open = false
                 notificationPopup.open = false
                 dateWidgetPopup.open = false
                 closeScreenshotPreview(true)
@@ -476,6 +511,7 @@ ShellRoot {
                 bluetoothPopup.open = false
                 wifiPopup.open = false
                 cpuPopup.open = false
+                memoryPopup.open = false
                 clipboardPopup.open = false
                 dateWidgetPopup.open = false
                 closeScreenshotPreview(true)
@@ -490,6 +526,7 @@ ShellRoot {
                 bluetoothPopup.open = false
                 wifiPopup.open = false
                 cpuPopup.open = false
+                memoryPopup.open = false
                 clipboardPopup.open = false
                 notificationPopup.open = false
                 closeScreenshotPreview(true)
@@ -503,6 +540,7 @@ ShellRoot {
                 bluetoothPopup.open = false
                 wifiPopup.open = false
                 cpuPopup.open = false
+                memoryPopup.open = false
                 clipboardPopup.open = false
                 notificationPopup.open = false
                 dateWidgetPopup.open = false
@@ -548,10 +586,11 @@ ShellRoot {
 
             HyprlandFocusGrab {
                 id: controllerFocusGrab
-                windows: [bar, cpuPopup, bluetoothPopup, wifiPopup, clipboardPopup, notificationPopup, dateWidgetPopup, settingsPopup, volumePopup, brightnessPopup, screenshotPopup]
+                windows: [bar, cpuPopup, memoryPopup, bluetoothPopup, wifiPopup, clipboardPopup, notificationPopup, dateWidgetPopup, settingsPopup, volumePopup, brightnessPopup, screenshotPopup]
                 active: bluetoothPopup.open
                     || wifiPopup.open
                     || cpuPopup.open
+                    || memoryPopup.open
                     || clipboardPopup.open
                     || notificationPopup.open
                     || dateWidgetPopup.open
@@ -778,7 +817,12 @@ ShellRoot {
                     }
                 }
             }
-            Component { id: memoryUsageIndicatorComp; MemoryUsageIndicator {} }
+            Component {
+                id: memoryUsageIndicatorComp
+                MemoryUsageIndicator {
+                    onClicked: bar.toggleMemoryController()
+                }
+            }
             Component {
                 id: cpuUsageIndicatorComp
                 CPUUsageIndicator {
@@ -854,6 +898,12 @@ ShellRoot {
                 cpuUsageIndicator: bar.cpuUsageIndicatorRef
             }
 
+            MemoryPopup {
+                id: memoryPopup
+                bar: bar
+                memoryUsageIndicator: bar.memoryUsageIndicatorRef
+            }
+
             Connections {
                 target: bar.cpuUsageIndicatorRef
                 function onWidthChanged() { bar.updateCpuPopupAnchor() }
@@ -861,8 +911,19 @@ ShellRoot {
             }
 
             Connections {
+                target: bar.memoryUsageIndicatorRef
+                function onWidthChanged() { bar.updateMemoryPopupAnchor() }
+                function onHeightChanged() { bar.updateMemoryPopupAnchor() }
+            }
+
+            Connections {
                 target: cpuPopup
                 function onOpenChanged() { bar.enforcePopupNoKeyboardFocus(cpuPopup) }
+            }
+
+            Connections {
+                target: memoryPopup
+                function onOpenChanged() { bar.enforcePopupNoKeyboardFocus(memoryPopup) }
             }
 
             BluetoothPopup {
@@ -916,6 +977,7 @@ ShellRoot {
                 updateBluetoothPopupAnchor()
                 updateWifiPopupAnchor()
                 updateCpuPopupAnchor()
+                updateMemoryPopupAnchor()
                 updateVolumePopupAnchor()
                 updateClipboardPopupAnchor()
                 updateBrightnessPopupAnchor()
@@ -925,6 +987,7 @@ ShellRoot {
                 updateBluetoothPopupAnchor()
                 updateWifiPopupAnchor()
                 updateCpuPopupAnchor()
+                updateMemoryPopupAnchor()
                 updateVolumePopupAnchor()
                 updateClipboardPopupAnchor()
                 updateBrightnessPopupAnchor()
