@@ -12,7 +12,8 @@ PanelWindow {
     property var imageComp
 
     implicitWidth: Theme.toastWidth
-    implicitHeight: bar && bar.screen ? bar.screen.height : 1080
+    // Keep the toast window content-sized so transparent empty space does not block clicks.
+    implicitHeight: Math.max(1, toastStack.implicitHeight)
     visible: toastModel && toastModel.count > 0 && bar && bar.hyprMonitor && bar.hyprMonitor.focused
     color: "transparent"
     screen: bar ? bar.screen : null
